@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=MTR Diagnostic Suite
+Exec=mtr-diagnostic-suite %U
+Terminal=false
+Type=Application
+Icon=${SNAP}/meta/gui/icon.png
+StartupWMClass=MTR Diagnostic Suite
+Categories=Utility;

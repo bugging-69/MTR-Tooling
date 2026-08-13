@@ -1,5 +1,7 @@
 {
   "name": "mtr-diagnostic-suite",
+  "author": "Willem Kuipers",
+  "description": "MTR Diagnostic Suite",
   "private": true,
   "version": "2.2.0",
   "type": "module",
@@ -15,25 +17,32 @@
     "electron:build": "npm run build && electron-builder"
   },
   "build": {
-    "appId": "com.mtr.diagnostic",
-    "productName": "MTR Diagnostic Suite",
-    "directories": {
-      "output": "release"
-    },
-    "win": {
-      "target": "nsis"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": true,
-      "allowToChangeInstallationDirectory": true,
-      "runAfterFinish": true
-    },
-    "files": [
-      "dist/**/*",
-      "electron-main.cjs",
-      "package.json"
-    ]
+  "appId": "com.mtr.diagnostic",
+  "productName": "MTR Diagnostic Suite",
+
+  "directories": {
+    "output": "release"
+  },
+
+  "files": [
+    "dist/**/*",
+    "electron-main.cjs",
+    "package.json"
+  ],
+
+  "win": {
+    "target": "nsis",
+    "icon": "build/icon.ico"
+  },
+
+  "nsis": {
+    "oneClick": false,
+    "perMachine": true,
+    "allowToChangeInstallationDirectory": true,
+    "runAfterFinish": true
+
+  },
+
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

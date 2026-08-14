@@ -1,3 +1,6 @@
+<img width="1299" height="465" alt="image" src="https://github.com/user-attachments/assets/8d1eb9ca-2573-4bf3-acd6-80ee7a0867c6" />
+
+
 this is a tool made for technicians and engineers to test and troubleshoot MTR devices.
 
 this is a very early release, the code is stable but is still early access.

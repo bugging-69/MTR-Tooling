@@ -26,13 +26,6 @@ export interface ScriptConfig {
   minimumDisplayCount: number;
   targetPingHost: string;
   targetPingPort: number;
-  requireIPv6: boolean;
-  requireTPM: boolean;
-  requireAzureAD: boolean;
-  exportFormat: 'hashtable' | 'json' | 'html' | 'csv' | 'all' | 'json_stdout';
-  autoElevateAdmin: boolean;
-  logToEventLog: boolean;
-  webhookUrl: string;
 }
 
 export interface MTRProfilePreset {

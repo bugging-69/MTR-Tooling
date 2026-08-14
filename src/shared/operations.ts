@@ -1,6 +1,6 @@
 export const operationIds = [
   'run-diagnostics',
-  'force-system-updates',
+  'scan-repair-updates',
   'install-mtr-update',
 ] as const;
 

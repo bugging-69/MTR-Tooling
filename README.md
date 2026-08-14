@@ -10,9 +10,9 @@ A technician-focused desktop tool for testing and troubleshooting Microsoft Team
 
 The renderer can request only these bundled operation IDs:
 
-- `run-diagnostics`
-- `force-system-updates`
-- `install-mtr-update`
+- `run-diagnostics` — read-only health checks
+- `scan-repair-updates` — requests a Windows Update scan and repairs existing MTR app registration; it does not install updates
+- `install-mtr-update` — downloads and runs the Microsoft-signed fixed MTR updater
 
 Script text and script types never cross HTTP or IPC boundaries. CMD launcher and EXE compiler actions are not runnable from the UI.
 

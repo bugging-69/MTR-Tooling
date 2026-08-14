@@ -37,8 +37,25 @@ $Url = "https://go.microsoft.com/fwlink/?linkid=2151817"
 $TargetScript = Join-Path $PSScriptRoot "official-mtr-update.ps1"
 
 try {
-    Invoke-WebRequest -Uri $Url -OutFile $TargetScript -UseBasicParsing
-    Unblock-File -Path $TargetScript
+    $Response = Invoke-WebRequest -Uri $Url -OutFile $TargetScript -UseBasicParsing -PassThru -ErrorAction Stop
+    if ($null -eq $Response -or [int]$Response.StatusCode -lt 200 -or [int]$Response.StatusCode -ge 300) {
+        throw "Official MTR update download did not return a successful HTTP status."
+    }
+    if (-not (Test-Path -LiteralPath $TargetScript -PathType Leaf)) {
+        throw "Official MTR update download did not create the expected file."
+    }
+    if ((Get-Item -LiteralPath $TargetScript -ErrorAction Stop).Length -eq 0) {
+        throw "Official MTR update download created an empty file."
+    }
+
+    $Signature = Get-AuthenticodeSignature -LiteralPath $TargetScript -ErrorAction Stop
+    if ($Signature.Status -ne 'Valid' -or
+        $null -eq $Signature.SignerCertificate -or
+        $Signature.SignerCertificate.Subject -notmatch '(^|,\\s*)O=Microsoft Corporation(,|$)') {
+        throw "Official MTR update signature is not valid or is not signed by Microsoft Corporation."
+    }
+
+    Unblock-File -LiteralPath $TargetScript -ErrorAction Stop
     & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -File $TargetScript
     if ($LASTEXITCODE -ne 0) {
         throw "Official MTR update failed with exit code $LASTEXITCODE."
@@ -56,16 +73,9 @@ const operations = {
       minimumDisplayCount: 1,
       targetPingHost: 'teams.microsoft.com',
       targetPingPort: 443,
-      requireIPv6: true,
-      requireTPM: true,
-      requireAzureAD: true,
-      exportFormat: 'json_stdout',
-      autoElevateAdmin: false,
-      logToEventLog: false,
-      webhookUrl: '',
     }),
   },
-  'force-system-updates': {
+  'scan-repair-updates': {
     requiresElevation: true,
     createScript: generateUpdateScript,
   },

@@ -14,12 +14,9 @@ export function generatePowerShellScript(config: ScriptConfig): string {
 
 #Requires -RunAsAdministrator
 [CmdletBinding()]
-param(
-    [string]$ExportPath = "$PSScriptRoot\\MTR_Health_Report_$((Get-Date).ToString('yyyyMMdd_HHmmss')).json",
-    [switch]$Quiet = $false
-)
+param()
 
-$ErrorActionPreference = "SilentlyContinue"
+$ErrorActionPreference = "Continue"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "   MICROSOFT TEAMS ROOMS (MTR) SYSTEM DIAGNOSTIC TEST" -ForegroundColor Yellow
@@ -27,46 +24,6 @@ Write-Host "==========================================================" -Foregro
 Write-Host "Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Gray
 Write-Host "Host: $env:COMPUTERNAME" -ForegroundColor Gray
 Write-Host "OS:   $((Get-CimInstance Win32_OperatingSystem).Caption)" -ForegroundColor Gray
-Write-Host "----------------------------------------------------------" -ForegroundColor Cyan
-
-# ------------------------------------------------------------------
-# Apply MTR Recommended Power & USB Configuration
-# ------------------------------------------------------------------
-Write-Host "Applying MTR Optimized Power & USB Settings..." -ForegroundColor Cyan
-
-# 1. Enable Ultimate Performance Power Plan
-try {
-    $guidOutput = (powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61 2>&1)
-    if ($guidOutput -match "([0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12})") {
-        powercfg -setactive $matches[1]
-        Write-Host " ✅ Power Plan set to Ultimate Performance" -ForegroundColor Green
-    } else {
-        powercfg -setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
-        Write-Host " ✅ Power Plan set to High Performance (Ultimate unavailable)" -ForegroundColor Green
-    }
-} catch {
-    Write-Host " ⚠️ Could not change power plan" -ForegroundColor Yellow
-}
-
-# 2. Turn off hard disk after -> 0 (Never)
-try {
-    powercfg -change -disk-timeout-dc 0
-    powercfg -change -disk-timeout-ac 0
-    Write-Host " ✅ Hard Disk Timeout set to 0 (Never)" -ForegroundColor Green
-} catch {
-    Write-Host " ⚠️ Could not set Hard Disk Timeout" -ForegroundColor Yellow
-}
-
-# 3. Disable USB Selective Suspend
-try {
-    powercfg -setacvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bea584571c 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
-    powercfg -setdcvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bea584571c 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
-    powercfg -setactive SCHEME_CURRENT
-    Write-Host " ✅ USB Selective Suspend Disabled" -ForegroundColor Green
-} catch {
-    Write-Host " ⚠️ Could not disable USB Selective Suspend" -ForegroundColor Yellow
-}
-
 Write-Host "----------------------------------------------------------" -ForegroundColor Cyan
 
 # ------------------------------------------------------------------
@@ -135,7 +92,7 @@ $cameras = Get-PnpDevice -Class Camera, Image -ErrorAction SilentlyContinue | Wh
 if ($cameras) {
     $camName = $cameras[0].FriendlyName
     $Results.Camera = "PASS"
-    $Details.Camera = "Camera operational: $camName"
+    $Details.Camera = "Camera detected with PnP status OK: $camName"
     Write-Host " ✅ Pass ($camName)" -ForegroundColor Green
 } else {
     $Results.Camera = "FAIL"
@@ -143,28 +100,38 @@ if ($cameras) {
     Write-Host " ❌ Fail" -ForegroundColor Red
 }
 
-# 4. Microphone Test
+# 4-5. Audio endpoint tests. MMDevice instance IDs identify capture (0.0.1) and render (0.0.0) roles.
+$audioEndpoints = Get-PnpDevice -Class AudioEndpoint -ErrorAction SilentlyContinue | Where-Object Status -eq 'OK'
+$captureEndpoints = $audioEndpoints | Where-Object { $_.InstanceId -and $_.InstanceId.StartsWith('SWD\\MMDEVAPI\\{0.0.1.') }
+$renderEndpoints = $audioEndpoints | Where-Object { $_.InstanceId -and $_.InstanceId.StartsWith('SWD\\MMDEVAPI\\{0.0.0.') }
+
 Write-Host "[4/19] Checking Microphone..." -NoNewline
-$mics = Get-CimInstance Win32_SoundDevice -ErrorAction SilentlyContinue | Where-Object Status -eq 'OK'
-if ($mics) {
+if ($captureEndpoints) {
     $Results.Microphone = "PASS"
-    $Details.Microphone = "Audio capture device active: $($mics[0].Name)"
+    $Details.Microphone = "Active audio capture endpoint: $($captureEndpoints[0].FriendlyName)"
     Write-Host " ✅ Pass" -ForegroundColor Green
+} elseif ($audioEndpoints) {
+    $Results.Microphone = "WARN"
+    $Details.Microphone = "Active audio endpoints exist, but a capture role could not be proven"
+    Write-Host " ⚠️ Warning" -ForegroundColor Yellow
 } else {
     $Results.Microphone = "FAIL"
-    $Details.Microphone = "No active audio capture/microphone endpoint"
+    $Details.Microphone = "No active audio endpoint detected"
     Write-Host " ❌ Fail" -ForegroundColor Red
 }
 
-# 5. Speakers Test
 Write-Host "[5/19] Checking Speakers..." -NoNewline
-if ($mics) {
+if ($renderEndpoints) {
     $Results.Speakers = "PASS"
-    $Details.Speakers = "Audio output device active: $($mics[0].Name)"
+    $Details.Speakers = "Active audio render endpoint: $($renderEndpoints[0].FriendlyName)"
     Write-Host " ✅ Pass" -ForegroundColor Green
+} elseif ($audioEndpoints) {
+    $Results.Speakers = "WARN"
+    $Details.Speakers = "Active audio endpoints exist, but a render role could not be proven"
+    Write-Host " ⚠️ Warning" -ForegroundColor Yellow
 } else {
     $Results.Speakers = "FAIL"
-    $Details.Speakers = "No active audio output endpoint"
+    $Details.Speakers = "No active audio endpoint detected"
     Write-Host " ❌ Fail" -ForegroundColor Red
 }
 
@@ -202,14 +169,22 @@ if ($ingest) {
 # 8. Network Test
 Write-Host "[8/19] Checking Physical Network Adapter..." -NoNewline
 $netAdapters = Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object Status -eq 'Up'
-if ($netAdapters) {
-    $adapter = $netAdapters[0]
+$qualifiedNetwork = foreach ($candidate in $netAdapters) {
+    $ipv4 = Get-NetIPAddress -InterfaceIndex $candidate.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        Where-Object { $_.IPAddress -and $_.IPAddress -notlike '169.254.*' -and $_.AddressState -eq 'Preferred' } |
+        Select-Object -First 1
+    if ($ipv4 -and $candidate.ReceiveLinkSpeed -ge 100000000) {
+        [pscustomobject]@{ Adapter = $candidate; IPv4 = $ipv4 }
+    }
+}
+if ($qualifiedNetwork) {
+    $network = $qualifiedNetwork | Select-Object -First 1
     $Results.Network = "PASS"
-    $Details.Network = "Network active: $($adapter.Name) @ $($adapter.LinkSpeed)"
-    Write-Host " ✅ Pass ($($adapter.LinkSpeed))" -ForegroundColor Green
+    $Details.Network = "Physical network active: $($network.Adapter.Name), IPv4 $($network.IPv4.IPAddress), $($network.Adapter.LinkSpeed)"
+    Write-Host " ✅ Pass ($($network.Adapter.LinkSpeed))" -ForegroundColor Green
 } else {
     $Results.Network = "FAIL"
-    $Details.Network = "No physical network adapter connected or link down"
+    $Details.Network = "No active physical adapter has both a preferred non-APIPA IPv4 address and at least 100 Mbps link speed"
     Write-Host " ❌ Fail" -ForegroundColor Red
 }
 
@@ -248,10 +223,7 @@ if ($ipv6Addresses) {
 
 # 11. TeamsApp Test
 Write-Host "[11/19] Checking Teams Room App Installation..." -NoNewline
-$mtrApp = Get-AppxPackage -AllUsers -Name "*SkypeRoomSystem*" -ErrorAction SilentlyContinue
-if (-not $mtrApp) {
-    $mtrApp = Get-AppxPackage -AllUsers -Name "*MSTeams*" -ErrorAction SilentlyContinue
-}
+$mtrApp = Get-AppxPackage -AllUsers -Name "Microsoft.SkypeRoomSystem" -ErrorAction SilentlyContinue
 if ($mtrApp) {
     $Results.TeamsApp = "PASS"
     $Details.TeamsApp = "MTR Application installed: $($mtrApp.Name)"
@@ -266,18 +238,18 @@ if ($mtrApp) {
 Write-Host "[12/19] Checking Teams Room Version..." -NoNewline
 if ($mtrApp) {
     $ver = $mtrApp.Version
-    $Results.TeamsVersion = "PASS"
-    $Details.TeamsVersion = "Version: $ver"
-    Write-Host " ✅ Pass ($ver)" -ForegroundColor Green
+    $Results.TeamsVersion = "WARN"
+    $Details.TeamsVersion = "Installed version: $ver. No minimum version baseline configured; compliance was not evaluated"
+    Write-Host " ⚠️ Version reported; no compliance baseline" -ForegroundColor Yellow
 } else {
     $Results.TeamsVersion = "FAIL"
-    $Details.TeamsVersion = "App version unavailable (App not installed)"
+    $Details.TeamsVersion = "App version unavailable (SkypeRoomSystem is not installed)"
     Write-Host " ❌ Fail" -ForegroundColor Red
 }
 
 # 13. Teams Services Test
 Write-Host "[13/19] Checking Teams Room Services..." -NoNewline
-$services = Get-Service -Name "SkypeRoomSystem*", "Teams*" -ErrorAction SilentlyContinue
+$services = Get-Service -Name "SkypeRoomSystem*" -ErrorAction SilentlyContinue
 $runningServices = $services | Where-Object Status -eq 'Running'
 if ($runningServices) {
     $Results.TeamsSvc = "PASS"
@@ -285,13 +257,13 @@ if ($runningServices) {
     Write-Host " ✅ Pass" -ForegroundColor Green
 } else {
     $Results.TeamsSvc = "WARN"
-    $Details.TeamsSvc = "Teams auto-update service or background service not running"
+    $Details.TeamsSvc = "No SkypeRoomSystem service is running"
     Write-Host " ⚠️ Warning" -ForegroundColor Yellow
 }
 
 # 14. Windows Activation Test
 Write-Host "[14/19] Checking Windows Licensing Activation..." -NoNewline
-$licensing = Get-CimInstance SoftwareLicensingProduct -Filter "PartialProductKey IS NOT NULL" -ErrorAction SilentlyContinue | Where-Object LicenseStatus -eq 1
+$licensing = Get-CimInstance SoftwareLicensingProduct -Filter "ApplicationID='55c92734-d682-4d71-983e-d6ec3f16059f' AND PartialProductKey IS NOT NULL" -ErrorAction SilentlyContinue | Where-Object LicenseStatus -eq 1
 if ($licensing) {
     $Results.Activation = "PASS"
     $Details.Activation = "Windows is fully licensed & activated"
@@ -320,13 +292,19 @@ if ($mfr -and $model) {
 # 16. TPM 2.0 Test
 Write-Host "[16/19] Checking TPM 2.0 Security Chip..." -NoNewline
 $tpm = Get-Tpm -ErrorAction SilentlyContinue
-if ($tpm.TpmPresent -and $tpm.TpmReady) {
+$tpmInfo = Get-CimInstance -Namespace 'Root\\CIMV2\\Security\\MicrosoftTpm' -ClassName Win32_Tpm -ErrorAction SilentlyContinue
+$tpmSpecVersions = @($tpmInfo.SpecVersion -split ',' | ForEach-Object Trim)
+if ($tpm.TpmPresent -and $tpm.TpmReady -and $tpmSpecVersions -contains '2.0') {
     $Results.TPM = "PASS"
-    $Details.TPM = "TPM Present and Ready (Windows 11 / BitLocker compliant)"
+    $Details.TPM = "TPM 2.0 is present and ready (SpecVersion: $($tpmInfo.SpecVersion))"
     Write-Host " ✅ Pass" -ForegroundColor Green
+} elseif ($tpm.TpmPresent -and -not ($tpmSpecVersions -contains '2.0')) {
+    $Results.TPM = "FAIL"
+    $Details.TPM = "TPM is present, but SpecVersion does not include 2.0 (reported: $($tpmInfo.SpecVersion))"
+    Write-Host " ❌ Fail (not TPM 2.0)" -ForegroundColor Red
 } elseif ($tpm.TpmPresent) {
     $Results.TPM = "WARN"
-    $Details.TPM = "TPM Present but not fully initialized/ready"
+    $Details.TPM = "TPM 2.0 is present but not ready"
     Write-Host " ⚠️ Warning" -ForegroundColor Yellow
 } else {
     $Results.TPM = "FAIL"
@@ -337,7 +315,12 @@ if ($tpm.TpmPresent -and $tpm.TpmReady) {
 # 17. Azure AD / Entra ID Join Test
 Write-Host "[17/19] Checking Entra ID / Azure AD Join Status..." -NoNewline
 $dsreg = dsregcmd /status 2>&1
-if ($dsreg -match "AzureAdJoined : YES" -or $dsreg -match "DomainJoined : YES") {
+$dsregExitCode = $LASTEXITCODE
+if ($dsregExitCode -ne 0) {
+    $Results.AzureAD = "FAIL"
+    $Details.AzureAD = "dsregcmd failed with exit code $dsregExitCode; join status could not be checked"
+    Write-Host " ❌ Fail (query error)" -ForegroundColor Red
+} elseif ($dsreg -match "AzureAdJoined : YES" -or $dsreg -match "DomainJoined : YES") {
     $Results.AzureAD = "PASS"
     $Details.AzureAD = "Device joined to Azure Active Directory / Domain"
     Write-Host " ✅ Pass" -ForegroundColor Green
@@ -369,14 +352,14 @@ if ($disk) {
 
 # 19. Windows Update Service Test
 Write-Host "[19/19] Checking Windows Update Service..." -NoNewline
-$wuSvc = Get-Service -Name "wuauserv" -ErrorAction SilentlyContinue
-if ($wuSvc.Status -eq 'Running' -or $wuSvc.StartType -eq 'Automatic') {
+$wuSvc = Get-CimInstance Win32_Service -Filter "Name='wuauserv'" -ErrorAction SilentlyContinue
+if ($wuSvc.State -eq 'Running' -and $wuSvc.StartMode -eq 'Auto') {
     $Results.Updates = "PASS"
-    $Details.Updates = "Windows Update service active ($($wuSvc.Status))"
+    $Details.Updates = "Windows Update service state is Running and startup mode is Auto"
     Write-Host " ✅ Pass" -ForegroundColor Green
 } else {
     $Results.Updates = "WARN"
-    $Details.Updates = "Windows Update service is stopped or disabled"
+    $Details.Updates = "Windows Update requires State=Running and StartMode=Auto; found State=$($wuSvc.State), StartMode=$($wuSvc.StartMode)"
     Write-Host " ⚠️ Warning" -ForegroundColor Yellow
 }
 
@@ -384,158 +367,67 @@ Write-Host "----------------------------------------------------------" -Foregro
 Write-Host "                  FINAL MTR RESULTS SUMMARY               " -ForegroundColor Yellow
 Write-Host "----------------------------------------------------------" -ForegroundColor Cyan
 
-# Output $Results Hashtable
-$Results | Format-Table -AutoSize
-
-if ('${config.exportFormat}' -eq 'json_stdout') {
-    # Output JSON directly to stdout
-    $ReportObject = [pscustomobject]@{
-        Timestamp      = (Get-Date -Format 'o')
-        ComputerName   = $env:COMPUTERNAME
-        OSVersion      = ((Get-CimInstance Win32_OperatingSystem).Caption)
-        PSVersion      = $PSVersionTable.PSVersion.ToString()
-        ResultsHashtable = $Results
-        Details        = $Details
-    }
-    $ReportObject | ConvertTo-Json -Depth 4
-} elseif ('${config.exportFormat}' -eq 'json' -or '${config.exportFormat}' -eq 'all') {
-    # Generate JSON Report
-    $ReportObject = [pscustomobject]@{
-        Timestamp      = (Get-Date -Format 'o')
-        ComputerName   = $env:COMPUTERNAME
-        OSVersion      = ((Get-CimInstance Win32_OperatingSystem).Caption)
-        PSVersion      = $PSVersionTable.PSVersion.ToString()
-        ResultsHashtable = $Results
-        Details        = $Details
-    }
-
-    try {
-        $ReportObject | ConvertTo-Json -Depth 4 | Out-File -FilePath $ExportPath -Encoding utf8
-        Write-Host "JSON Report saved to: $ExportPath" -ForegroundColor Green
-    } catch {
-        Write-Host "Could not save JSON report file." -ForegroundColor Yellow
-    }
+# Return the report through stdout only. File export is handled by the renderer after the read-only operation.
+$ReportObject = [pscustomobject]@{
+    Timestamp        = (Get-Date -Format 'o')
+    ComputerName     = $env:COMPUTERNAME
+    OSVersion        = ((Get-CimInstance Win32_OperatingSystem).Caption)
+    PSVersion        = $PSVersionTable.PSVersion.ToString()
+    ResultsHashtable = $Results
+    Details          = $Details
 }
+$ReportObject | ConvertTo-Json -Depth 4
 
-if ('${config.exportFormat}' -eq 'html' -or '${config.exportFormat}' -eq 'all') {
-    # Generate HTML Report
-    try {
-        $HtmlPath = "$PSScriptRoot\MTR_Health_Report_$((Get-Date).ToString('yyyyMMdd_HHmmss')).html"
-        
-        $HtmlBody = @"
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>MTR Health Report</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f9f9; color: #333; margin: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { border-bottom: 2px solid #0078d4; padding-bottom: 10px; color: #0078d4; margin-top: 0; }
-        .meta { margin-bottom: 20px; font-size: 14px; color: #555; background: #f0f8ff; padding: 15px; border-radius: 6px; border-left: 4px solid #0078d4; }
-        .meta p { margin: 5px 0; }
-        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-        th, td { border: 1px solid #e0e0e0; text-align: left; padding: 12px; }
-        th { background-color: #0078d4; color: white; }
-        tr:nth-child(even) { background-color: #f8f9fa; }
-        .status-pass { color: #107c10; font-weight: bold; }
-        .status-warn { color: #d83b01; font-weight: bold; }
-        .status-fail { color: #a4262c; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>Microsoft Teams Rooms Health Report</h2>
-        <div class="meta">
-            <p><strong>Host:</strong> $env:COMPUTERNAME</p>
-            <p><strong>Time:</strong> $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))</p>
-            <p><strong>OS:</strong> $((Get-CimInstance Win32_OperatingSystem).Caption)</p>
-        </div>
-        <table>
-            <tr><th>Test Parameter</th><th>Status</th><th>Details</th></tr>
-"@
-
-        foreach ($key in $Results.Keys) {
-            $status = $Results[$key]
-            $detail = if ($Details[$key]) { $Details[$key] } else { "N/A" }
-            $statusClass = ""
-            if ($status -match "PASS") { $statusClass = "status-pass" }
-            elseif ($status -match "WARN") { $statusClass = "status-warn" }
-            elseif ($status -match "FAIL") { $statusClass = "status-fail" }
-            
-            $HtmlBody += "<tr><td><strong>$key</strong></td><td class='$statusClass'>$status</td><td>$detail</td></tr>\`n"
-        }
-
-        $HtmlBody += @"
-        </table>
-    </div>
-</body>
-</html>
-"@
-        $HtmlBody | Out-File -FilePath $HtmlPath -Encoding utf8
-        Write-Host "HTML Report saved to: $HtmlPath" -ForegroundColor Green
-        
-        # Auto-open HTML report
-        Invoke-Item $HtmlPath -ErrorAction SilentlyContinue
-    } catch {
-        Write-Host "Could not save or open HTML report file." -ForegroundColor Yellow
-    }
-}
-
-return $Results
 `;
 }
 
 export function generateUpdateScript(): string {
   return `<#
 .SYNOPSIS
-    MTR Force Update Script (TPM, Windows Updates, Teams App)
+    Requests a Windows Update scan and repairs existing Teams Rooms app registration.
+.DESCRIPTION
+    This operation does not install updates or claim that OS, Store, Teams, or firmware versions changed.
 #>
 $ErrorActionPreference = "Stop"
 $OperationFailed = $false
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   MTR FORCE UPDATE: TPM, TEAMS, & WINDOWS UPDATES" -ForegroundColor Yellow
+Write-Host "   WINDOWS UPDATE SCAN & MTR APP REGISTRATION REPAIR" -ForegroundColor Yellow
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# 1. Force Windows Updates
-Write-Host "[1/3] Triggering Windows Updates..." -NoNewline
+Write-Host "[1/2] REQUESTED: Windows Update interactive scan (does not install updates)..." -NoNewline
 try {
-    Start-Process -FilePath "UsoClient.exe" -ArgumentList "StartInteractiveScan" -Wait -NoNewWindow
-    Write-Host " PASS (Update Scan Triggered)" -ForegroundColor Green
-} catch {
-    $OperationFailed = $true
-    Write-Host " FAIL" -ForegroundColor Red
-}
-
-# 2. Update Teams App (UWP)
-Write-Host "[2/3] Checking for Teams Room App Updates..." -NoNewline
-try {
-    # Attempt to trigger Store update for SkypeRoomSystem
-    Get-AppxPackage -AllUsers -Name "*SkypeRoomSystem*" | foreach { Add-AppxPackage -DisableDevelopmentMode -Register "$($_.InstallLocation)\\AppXManifest.xml" }
-    Write-Host " PASS (App re-registered/updated)" -ForegroundColor Green
-} catch {
-    $OperationFailed = $true
-    Write-Host " FAIL" -ForegroundColor Red
-}
-
-# 3. TPM Health Check / Reset
-Write-Host "[3/3] Checking TPM Status..." -NoNewline
-try {
-    $tpm = Get-Tpm
-    if ($tpm.TpmReady) {
-        Write-Host " PASS (TPM is Ready and active)" -ForegroundColor Green
-    } else {
-        Write-Host " WARN (TPM not ready, attempting to initialize...)" -ForegroundColor Yellow
-        Initialize-Tpm -ErrorAction SilentlyContinue
+    $scanProcess = Start-Process -FilePath "UsoClient.exe" -ArgumentList "StartInteractiveScan" -Wait -NoNewWindow -PassThru
+    if ($scanProcess.ExitCode -ne 0) {
+        throw "UsoClient scan request failed with exit code $($scanProcess.ExitCode)."
     }
+    Write-Host " ACCEPTED" -ForegroundColor Green
 } catch {
     $OperationFailed = $true
-    Write-Host " FAIL" -ForegroundColor Red
+    Write-Host " FAILED: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+Write-Host "[2/2] REQUESTED: Re-register existing SkypeRoomSystem package (repair only)..." -NoNewline
+try {
+    $mtrPackages = @(Get-AppxPackage -AllUsers -Name "Microsoft.SkypeRoomSystem" -ErrorAction Stop)
+    if ($mtrPackages.Count -eq 0) {
+        throw "SkypeRoomSystem package is not installed; registration repair was not run."
+    }
+    foreach ($mtrPackage in $mtrPackages) {
+        $manifestPath = Join-Path $mtrPackage.InstallLocation "AppXManifest.xml"
+        if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+            throw "App manifest was not found at the installed package location."
+        }
+        Add-AppxPackage -DisableDevelopmentMode -Register $manifestPath -ErrorAction Stop
+    }
+    Write-Host " COMPLETED (registration repair only; no app version change claimed)" -ForegroundColor Green
+} catch {
+    $OperationFailed = $true
+    Write-Host " FAILED: $($_.Exception.Message)" -ForegroundColor Red
 }
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "Update routines completed." -ForegroundColor Green
+Write-Host "Requested scan and repair steps finished. No update installation is claimed." -ForegroundColor Cyan
 if ($OperationFailed) { exit 1 }
 `;
 }

@@ -92,7 +92,7 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
     } else if (rawOutput) {
       txtContent += `CONSOLE OUTPUT:\n${rawOutput}\n`;
     } else {
-      txtContent += `Note: Run "Run Diagnostics & Optimize" to include live parameter status checks.\n`;
+      txtContent += `Note: Run "Run Diagnostics" to include live parameter status checks.\n`;
     }
 
     txtContent += `================================================================\nEND OF DIAGNOSTIC LOG\n================================================================\n`;
@@ -188,7 +188,7 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
           >
             <Terminal className="w-7 h-7 text-blue-400 mb-2" />
             <span className="font-semibold text-slate-200 text-center text-sm">Run Diagnostics</span>
-            <span className="text-xs text-slate-500 mt-1">Fixed diagnostic operation</span>
+            <span className="text-xs text-slate-500 mt-1">Read-only 19-point health check</span>
           </button>
 
           <button
@@ -202,13 +202,13 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
           </button>
 
           <button
-            onClick={() => runOperation('force-system-updates')}
+            onClick={() => runOperation('scan-repair-updates')}
             disabled={isRunning}
             className="flex flex-col items-center justify-center p-5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl transition shadow-sm disabled:opacity-50"
           >
             <DownloadCloud className="w-7 h-7 text-orange-400 mb-2" />
-            <span className="font-semibold text-slate-200 text-center text-sm">Force System Updates</span>
-            <span className="text-xs text-slate-500 mt-1">TPM, Store, OS</span>
+            <span className="font-semibold text-slate-200 text-center text-sm">Scan Updates & Repair MTR App</span>
+            <span className="text-xs text-slate-500 mt-1">Requests a scan; does not install updates</span>
           </button>
         </div>
       ) : (
@@ -224,7 +224,7 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
               ) : (
                 <Play className="w-5 h-5" />
               )}
-              <span>{isRunning && activeJob === 'run-diagnostics' ? 'Running Checks...' : 'Run Diagnostics & Optimize'}</span>
+              <span>{isRunning && activeJob === 'run-diagnostics' ? 'Running Checks...' : 'Run Diagnostics'}</span>
             </button>
 
             <button
@@ -241,16 +241,16 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
             </button>
 
             <button
-              onClick={() => runOperation('force-system-updates')}
+              onClick={() => runOperation('scan-repair-updates')}
               disabled={isRunning}
               className="flex items-center space-x-3 bg-orange-600 hover:bg-orange-500 text-white font-bold py-4 px-6 rounded-2xl shadow-xl hover:shadow-orange-500/20 transition-all disabled:opacity-50 text-base justify-center"
             >
-              {isRunning && activeJob === 'force-system-updates' ? (
+              {isRunning && activeJob === 'scan-repair-updates' ? (
                 <RefreshCw className="w-5 h-5 animate-spin" />
               ) : (
                 <DownloadCloud className="w-5 h-5" />
               )}
-              <span>{isRunning && activeJob === 'force-system-updates' ? 'Updating...' : 'Force System Updates'}</span>
+              <span>{isRunning && activeJob === 'scan-repair-updates' ? 'Requesting Scan & Repair...' : 'Scan Updates & Repair MTR App'}</span>
             </button>
           </div>
 
@@ -510,7 +510,7 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
                 <div className="text-xs space-y-1">
                   <p className="font-semibold text-purple-200">Automated Installation Available</p>
                   <p className="text-purple-300/80">
-                    Clicking <strong className="text-white">"Install Newest Teams Room"</strong> automatically downloads, unblocks, and executes the official update script with unrestricted policy on this machine while running as Administrator.
+                    Clicking <strong className="text-white">"Install Newest Teams Room"</strong> downloads the script into the private operation directory, requires a valid Microsoft Authenticode signature, then unblocks and executes that exact file as Administrator.
                   </p>
                 </div>
               </div>

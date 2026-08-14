@@ -20,7 +20,8 @@ const createDependencies = (overrides: Partial<OperationRunnerDependencies> = {}
 
 test('only fixed operation IDs cross the execution boundary', () => {
   assert.equal(parseOperationId('run-diagnostics'), 'run-diagnostics');
-  assert.equal(parseOperationId('force-system-updates'), 'force-system-updates');
+  assert.equal(parseOperationId('scan-repair-updates'), 'scan-repair-updates');
+  assert.equal(parseOperationId('force-system-updates'), null);
   assert.equal(parseOperationId('install-mtr-update'), 'install-mtr-update');
   assert.equal(parseOperationId('powershell'), null);
   assert.equal(parseOperationId({ scriptContent: 'whoami', scriptType: 'powershell' }), null);
@@ -71,7 +72,7 @@ test('elevation is evaluated for every privileged operation request', async () =
   }));
 
   const first = await runner('run-diagnostics');
-  const second = await runner('force-system-updates');
+  const second = await runner('scan-repair-updates');
 
   assert.equal(elevationChecks, 2);
   assert.equal(processRuns, 0);
@@ -129,7 +130,7 @@ test('execution uses a private unique temp directory and always cleans it', asyn
   assert.deepEqual(events.slice(-2), ['run', 'remove:C:\\private\\mtr-operation-4f0c']);
 });
 
-test('the fixed system update exits non-zero when a step fails', async () => {
+test('the fixed scan and repair operation exits non-zero when a step fails', async () => {
   let script = '';
   const runner = createOperationRunner(createDependencies({
     writePrivateFile: async (_file, content) => {
@@ -137,7 +138,7 @@ test('the fixed system update exits non-zero when a step fails', async () => {
     },
   }));
 
-  await runner('force-system-updates');
+  await runner('scan-repair-updates');
 
   assert.match(script, /\$OperationFailed = \$true/);
   assert.match(script, /if \(\$OperationFailed\) \{ exit 1 \}/);

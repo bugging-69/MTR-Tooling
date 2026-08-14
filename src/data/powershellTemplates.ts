@@ -12,7 +12,7 @@ export function generatePowerShellScript(config: ScriptConfig): string {
     Execution Policy required: Bypass or Unrestricted
 #>
 
-# Requires -RunAsAdministrator
+#Requires -RunAsAdministrator
 [CmdletBinding()]
 param(
     [string]$ExportPath = "$PSScriptRoot\\MTR_Health_Report_$((Get-Date).ToString('yyyyMMdd_HHmmss')).json",
@@ -486,148 +486,14 @@ return $Results
 `;
 }
 
-export function generateBatchLauncher(): string {
-  return `@echo off
-:: ============================================================================
-:: Microsoft Teams Room (MTR) Diagnostic Automated Executable Launcher
-:: Auto-elevates as Administrator and executes Test-MTRHealth.ps1
-:: ============================================================================
-title MTR Health Diagnostic Tool
-
-:: Check for Administrator Rights
-net session >nul 2>&1
-if %errorLevel% neq 0 (
-    echo [MTR Tool] Requesting Administrator Privileges...
-    powershell -Command "Start-Process '%~0' -Verb RunAs"
-    exit /b
-)
-
-cd /d "%~dp0"
-echo ========================================================================
-echo               MICROSOFT TEAMS ROOMS DIAGNOSTIC LAUNCHER
-echo ========================================================================
-echo Running MTR Diagnostic Powershell Engine...
-echo.
-
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Test-MTRHealth.ps1"
-
-echo.
-echo ========================================================================
-echo Execution finished. Press any key to exit...
-pause >nul
-`;
-}
-
-export function generateExeCompilerScript(): string {
-  return `<#
-.SYNOPSIS
-    Builds a standalone executable (Test-MTRHealth.exe) from Test-MTRHealth.ps1
-.DESCRIPTION
-    Uses Install-Module PS2EXE or native IExpress to compile the PowerShell script
-    into a self-contained Windows .EXE binary.
-#>
-
-[CmdletBinding()]
-param()
-
-$ScriptPath = "$PSScriptRoot\\Test-MTRHealth.ps1"
-$ExePath    = "$PSScriptRoot\\Test-MTRHealth.exe"
-
-Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "      COMPILING MTR HEALTH SCRIPT TO STANDALONE EXE       " -ForegroundColor Yellow
-Write-Host "==========================================================" -ForegroundColor Cyan
-
-if (-not (Test-Path $ScriptPath)) {
-    Write-Error "Script file $ScriptPath not found!"
-    exit 1
-}
-
-# Check if PS2EXE module is installed
-if (-not (Get-Module -ListAvailable -Name ps2exe)) {
-    Write-Host "Installing PS2EXE compiler module from PowerShell Gallery..." -ForegroundColor Yellow
-    Install-Module -Name ps2exe -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
-}
-
-Write-Host "Compiling $ScriptPath -> $ExePath..." -ForegroundColor Green
-Invoke-PS2EXE -InputFile $ScriptPath -OutputFile $ExePath -Title "MTR Health Diagnostic Tool" -Description "Microsoft Teams Rooms System Functionality Tester" -Company "Enterprise IT" -Version "1.0.0.0" -RequireAdmin -NoConsole:$false
-
-if (Test-Path $ExePath) {
-    Write-Host "SUCCESS! Executable generated at: $ExePath" -ForegroundColor Green
-} else {
-    Write-Host "Compilation failed or output file not created." -ForegroundColor Red
-}
-`;
-}
-
-export function generateReadmeDoc(): string {
-  return `# Microsoft Teams Rooms (MTR) Diagnostic Executable Package
-
-## Overview
-This package contains a complete Windows diagnostic tool built to verify Microsoft Teams Rooms (MTR) system health across 19 critical hardware, video, audio, network, software, and security parameters.
-
----
-
-## Output Hashtable Specification
-When executed, the script initializes and populates the ordered hashtable:
-
-\`\`\`powershell
-$Results = [ordered]@{
-    Display         = "FAIL"
-    DisplayCount    = "FAIL"
-    Camera          = "FAIL"
-    Microphone      = "FAIL"
-    Speakers        = "FAIL"
-    VendorDevices   = "FAIL"
-    HDMIIngest      = "FAIL"
-    Network         = "FAIL"
-    Internet        = "FAIL"
-    IPv6            = "FAIL"
-    TeamsApp        = "FAIL"
-    TeamsVersion    = "FAIL"
-    TeamsSvc        = "FAIL"
-    Activation      = "FAIL"
-    NUCModel        = "FAIL"
-    TPM             = "FAIL"
-    AzureAD         = "FAIL"
-    DiskSpace       = "FAIL"
-    Updates         = "FAIL"
-}
-\`\`\`
-
----
-
-## File Manifest
-1. **\`Test-MTRHealth.ps1\`**: Primary PowerShell diagnostic engine.
-2. **\`Run-MTRCheck.cmd\`**: Administrator elevation double-clickable launcher batch script.
-3. **\`Build-MTRCheckExe.ps1\`**: Standalone compiler script to turn \`Test-MTRHealth.ps1\` into a native \`Test-MTRHealth.exe\` binary using PS2EXE.
-4. **\`MTR_Health_Report_*.json\`**: Automatically created JSON result log on each run.
-
----
-
-## How to Run
-### Method 1: Double-Click Launcher (Easiest)
-1. Right-click \`Run-MTRCheck.cmd\` and select **Run as Administrator**.
-2. The terminal will open, perform all 19 checks, print the colored status table, and save a JSON log.
-
-### Method 2: Compile to Standalone .EXE Binary
-1. Open PowerShell as Administrator in the folder.
-2. Run \`.\\Build-MTRCheckExe.ps1\`.
-3. Once compiled, copy \`Test-MTRHealth.exe\` to any USB flash drive or deploy via Intune / SCCM / Action1 / Datto RMM!
-
----
-
-## Deployment Options
-- **Microsoft Intune**: Upload \`Test-MTRHealth.ps1\` as a Remediation Script or Win32App package.
-- **Group Policy (GPO)**: Configure as a Scheduled Task on room startup under the \`Skype\` user account context.
-- **RMM Scripts**: Run via PowerShell remote execution engine across your MTR fleet.
-`;
-}
-
 export function generateUpdateScript(): string {
   return `<#
 .SYNOPSIS
     MTR Force Update Script (TPM, Windows Updates, Teams App)
 #>
+$ErrorActionPreference = "Stop"
+$OperationFailed = $false
+
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "   MTR FORCE UPDATE: TPM, TEAMS, & WINDOWS UPDATES" -ForegroundColor Yellow
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -638,6 +504,7 @@ try {
     Start-Process -FilePath "UsoClient.exe" -ArgumentList "StartInteractiveScan" -Wait -NoNewWindow
     Write-Host " PASS (Update Scan Triggered)" -ForegroundColor Green
 } catch {
+    $OperationFailed = $true
     Write-Host " FAIL" -ForegroundColor Red
 }
 
@@ -648,6 +515,7 @@ try {
     Get-AppxPackage -AllUsers -Name "*SkypeRoomSystem*" | foreach { Add-AppxPackage -DisableDevelopmentMode -Register "$($_.InstallLocation)\\AppXManifest.xml" }
     Write-Host " PASS (App re-registered/updated)" -ForegroundColor Green
 } catch {
+    $OperationFailed = $true
     Write-Host " FAIL" -ForegroundColor Red
 }
 
@@ -662,124 +530,12 @@ try {
         Initialize-Tpm -ErrorAction SilentlyContinue
     }
 } catch {
+    $OperationFailed = $true
     Write-Host " FAIL" -ForegroundColor Red
 }
 
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "Update routines completed." -ForegroundColor Green
+if ($OperationFailed) { exit 1 }
 `;
 }
-
-export function generateMtrOfflineUpdateScript(): string {
-  return `<#
-.SYNOPSIS
-    Microsoft Teams Rooms (MTR) Official App Offline Update Automator
-.DESCRIPTION
-    Downloads the newest official Microsoft MTR offline update script (linkid=2151817),
-    unblocks the downloaded script using Unblock-File,
-    and executes it with PowerShell -ExecutionPolicy Unrestricted.
-#>
-
-[CmdletBinding()]
-param()
-
-$ErrorActionPreference = "Continue"
-
-Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   MICROSOFT TEAMS ROOMS (MTR) OFFICIAL APP UPDATE" -ForegroundColor Yellow
-Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Gray
-Write-Host "Source Link: https://go.microsoft.com/fwlink/?linkid=2151817" -ForegroundColor Gray
-Write-Host "----------------------------------------------------------" -ForegroundColor Cyan
-
-# 1. Determine Downloads / Target Directory
-$DownloadsFolder = "$env:USERPROFILE\\Downloads"
-if (-not (Test-Path -Path $DownloadsFolder)) {
-    $DownloadsFolder = "C:\\Users\\Admin\\Downloads"
-}
-
-Write-Host "[1/4] Checking & Downloading latest MTR Offline App Update Script..." -ForegroundColor Cyan
-$Url = "https://go.microsoft.com/fwlink/?linkid=2151817"
-
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-$TempDownloadPath = Join-Path $DownloadsFolder "MTR-Update-Latest.ps1"
-
-try {
-    if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-        & curl.exe -s -L "https://go.microsoft.com/fwlink/?linkid=2151817" -o "$TempDownloadPath"
-    } else {
-        (New-Object System.Net.WebClient).DownloadFile($Url, $TempDownloadPath)
-    }
-    Write-Host " ✅ Download request sent to $Url" -ForegroundColor Green
-} catch {
-    Write-Host " ⚠️ Direct web download warning: $_" -ForegroundColor Yellow
-    Write-Host "    Will search local Downloads folder for existing MTR-Update-*.ps1 files..." -ForegroundColor Gray
-}
-
-# 2. Search for downloaded MTR-Update script file
-$ScriptFiles = Get-ChildItem -Path $DownloadsFolder -Filter "MTR-Update-*.ps1" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
-if (-not $ScriptFiles) {
-    $ScriptFiles = Get-ChildItem -Path $DownloadsFolder -Filter "MTR-Update*.ps1" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
-}
-if (-not $ScriptFiles) {
-    $ScriptFiles = Get-ChildItem -Path "C:\\Users\\Admin\\Downloads" -Filter "MTR-Update*.ps1" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
-}
-if (-not $ScriptFiles) {
-    $ScriptFiles = Get-ChildItem -Path $PSScriptRoot -Filter "MTR-Update*.ps1" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
-}
-
-if (-not $ScriptFiles) {
-    Write-Host " ❌ No MTR-Update-*.ps1 script found in Downloads folder!" -ForegroundColor Red
-    Write-Host "    Download manually from: https://go.microsoft.com/fwlink/?linkid=2151817" -ForegroundColor Yellow
-    Write-Host "    Save as MTR-Update-x.x.x.x.ps1 in C:\\Users\\Admin\\Downloads" -ForegroundColor Yellow
-    exit 1
-}
-
-$TargetScript = $ScriptFiles[0].FullName
-Write-Host " ✅ Located update script: $TargetScript" -ForegroundColor Green
-
-# 3. Unblock the file
-Write-Host "[2/4] Unblocking script file (Unblock-File)..." -ForegroundColor Cyan
-try {
-    Unblock-File -Path $TargetScript -ErrorAction SilentlyContinue
-    Write-Host " ✅ Script unblocked successfully." -ForegroundColor Green
-} catch {
-    Write-Host " ⚠️ Unblock-File note: $_" -ForegroundColor Yellow
-}
-
-# 4. Check installed Teams Room App
-Write-Host "[3/4] Verifying installed SkypeRoomSystem package..." -ForegroundColor Cyan
-try {
-    $mtrApp = Get-AppxPackage -AllUsers -Name "*SkypeRoomSystem*" -ErrorAction SilentlyContinue
-    if ($mtrApp) {
-        Write-Host " ✅ Current MTR App Version: $($mtrApp.Version)" -ForegroundColor Green
-    } else {
-        Write-Host " ℹ️ SkypeRoomSystem package check complete." -ForegroundColor Gray
-    }
-} catch {
-    Write-Host " ⚠️ App check warning: $_" -ForegroundColor Yellow
-}
-
-# 5. Execute Update Script with Unrestricted Policy
-Write-Host "[4/4] Executing Teams Rooms Update Script..." -ForegroundColor Cyan
-Write-Host " Running: PowerShell -ExecutionPolicy Unrestricted '$TargetScript'" -ForegroundColor Yellow
-Write-Host "----------------------------------------------------------" -ForegroundColor Cyan
-
-try {
-    $process = Start-Process -FilePath "powershell.exe" -ArgumentList "-ExecutionPolicy Unrestricted -NoProfile -File '$TargetScript'" -Wait -PassThru -NoNewWindow
-    if ($process.ExitCode -eq 0) {
-        Write-Host "==========================================================" -ForegroundColor Cyan
-        Write-Host " ✅ Microsoft Teams Rooms Update completed successfully!" -ForegroundColor Green
-        Write-Host "==========================================================" -ForegroundColor Cyan
-    } else {
-        Write-Host "==========================================================" -ForegroundColor Cyan
-        Write-Host " ⚠️ MTR Update script finished with exit code: $($process.ExitCode)" -ForegroundColor Yellow
-        Write-Host "==========================================================" -ForegroundColor Cyan
-    }
-} catch {
-    Write-Host " ❌ Failed to execute update script: $_" -ForegroundColor Red
-}
-`;
-}
-

@@ -16,9 +16,9 @@ export interface MTRReport {
   computerName: string;
   osVersion: string;
   powershellVersion: string;
-  overallStatus: 'HEALTHY' | 'WARNING' | 'CRITICAL';
+  overallStatus: 'Healthy' | 'Warning' | 'Critical';
   results: Record<string, string>; // e.g. { Display: "✅ Pass (2 Monitors, 1920x1080)", ... }
-  checkDetails: MTRCheckResult[];
+  checkDetails: Record<string, string>;
 }
 
 export interface ScriptConfig {

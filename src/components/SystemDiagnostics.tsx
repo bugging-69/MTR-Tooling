@@ -1,9 +1,34 @@
 import React, { useState } from 'react';
-import { Play, CheckCircle2, AlertTriangle, XCircle, RefreshCw, Server, Info, Terminal, Code, Package, DownloadCloud, FileText, Download, Building, MapPin, X, ExternalLink, ShieldCheck, Copy, Check, Sparkles } from 'lucide-react';
-import { generatePowerShellScript, generateBatchLauncher, generateExeCompilerScript, generateUpdateScript, generateMtrOfflineUpdateScript } from '../data/powershellTemplates';
+import { Play, CheckCircle2, AlertTriangle, XCircle, RefreshCw, Server, Info, Terminal, DownloadCloud, FileText, Download, Building, MapPin, X, ExternalLink, ShieldCheck, Copy, Check, Sparkles } from 'lucide-react';
+import { executeOperation, executionFailureMessage } from '../runtime/executionClient';
+import type { OperationId } from '../shared/operations';
 import { MTRReport } from '../types';
 
-export const SystemDiagnostics: React.FC<{ isAdmin?: boolean }> = ({ isAdmin }) => {
+interface DiagnosticOutput {
+  Timestamp: string;
+  ComputerName: string;
+  OSVersion: string;
+  PSVersion: string;
+  ResultsHashtable: Record<string, string>;
+  Details: Record<string, string>;
+}
+
+const isStringRecord = (value: unknown): value is Record<string, string> =>
+  typeof value === 'object' && value !== null &&
+  Object.values(value).every((entry) => typeof entry === 'string');
+
+const isDiagnosticOutput = (value: unknown): value is DiagnosticOutput => {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Partial<DiagnosticOutput>;
+  return typeof candidate.Timestamp === 'string' &&
+    typeof candidate.ComputerName === 'string' &&
+    typeof candidate.OSVersion === 'string' &&
+    typeof candidate.PSVersion === 'string' &&
+    isStringRecord(candidate.ResultsHashtable) &&
+    isStringRecord(candidate.Details);
+};
+
+export const SystemDiagnostics: React.FC<{ advancedToolsEnabled?: boolean }> = ({ advancedToolsEnabled }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [report, setReport] = useState<MTRReport | null>(null);
   const [rawOutput, setRawOutput] = useState<string | null>(null);
@@ -89,103 +114,42 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
     setShowExportModal(false);
   };
 
-  const runScript = async (type: 'ps1' | 'cmd' | 'exe' | 'update' | 'mtr-update') => {
+  const runOperation = async (operationId: OperationId) => {
     setIsRunning(true);
-    setActiveJob(type);
+    setActiveJob(operationId);
     setReport(null);
     setRawOutput(null);
     setError(null);
 
     try {
-      let script = '';
-      let scriptType = 'powershell';
+      const result = await executeOperation(operationId);
+      setRawOutput(result.stdout || null);
+      setError(executionFailureMessage(result));
 
-      if (type === 'ps1') {
-        script = generatePowerShellScript({
-          minimumDiskSpaceGB: 15,
-          minimumDisplayCount: 1,
-          targetPingHost: 'teams.microsoft.com',
-          targetPingPort: 443,
-          requireIPv6: true,
-          requireTPM: true,
-          requireAzureAD: true,
-          exportFormat: 'json_stdout',
-          autoElevateAdmin: false,
-          logToEventLog: false,
-          webhookUrl: ''
-        });
-        scriptType = 'powershell';
-      } else if (type === 'cmd') {
-        script = generateBatchLauncher();
-        scriptType = 'cmd';
-      } else if (type === 'exe') {
-        script = generateExeCompilerScript();
-        scriptType = 'powershell';
-      } else if (type === 'update') {
-        script = generateUpdateScript();
-        scriptType = 'powershell';
-      } else if (type === 'mtr-update') {
-        script = generateMtrOfflineUpdateScript();
-        scriptType = 'powershell';
-      }
-
-      const response = await fetch('/api/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scriptContent: script,
-          scriptType
-        })
-      });
-
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to execute script');
-      }
-      
-      setRawOutput(result.output);
-
-      if (type === 'ps1') {
+      if (result.success && operationId === 'run-diagnostics') {
         try {
-          const jsonMatch = result.output.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            if (parsed.ResultsHashtable) {
-              let passed = 0;
-              let warnings = 0;
-              let failed = 0;
-              const results = parsed.ResultsHashtable;
-              for (const key in results) {
-                const val = results[key];
-                if (val.includes('PASS')) passed++;
-                else if (val.includes('WARN')) warnings++;
-                else if (val.includes('FAIL')) failed++;
-              }
-              let overallStatus: 'Healthy' | 'Warning' | 'Critical' = 'Healthy';
-              if (failed > 0) overallStatus = 'Critical';
-              else if (warnings > 0) overallStatus = 'Warning';
-              setReport({
-                timestamp: parsed.Timestamp,
-                computerName: parsed.ComputerName,
-                osVersion: parsed.OSVersion,
-                powershellVersion: parsed.PSVersion,
-                overallStatus,
-                results: parsed.ResultsHashtable,
-                checkDetails: parsed.Details
-              });
-            }
+          const jsonMatch = result.stdout.match(/\{[\s\S]*\}/);
+          const parsed: unknown = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+          if (isDiagnosticOutput(parsed)) {
+            const statuses = Object.values(parsed.ResultsHashtable);
+            const failed = statuses.some((status) => status.includes('FAIL'));
+            const warnings = statuses.some((status) => status.includes('WARN'));
+            setReport({
+              timestamp: parsed.Timestamp,
+              computerName: parsed.ComputerName,
+              osVersion: parsed.OSVersion,
+              powershellVersion: parsed.PSVersion,
+              overallStatus: failed ? 'Critical' : warnings ? 'Warning' : 'Healthy',
+              results: parsed.ResultsHashtable,
+              checkDetails: parsed.Details,
+            });
           }
         } catch (parseError) {
-          console.error("Error parsing JSON output:", parseError);
+          console.error('Error parsing JSON output:', parseError);
         }
       }
-      
-      if (result.error && !result.output) {
-        setError(result.error);
-      }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
     } finally {
       setIsRunning(false);
       setActiveJob('');
@@ -215,20 +179,20 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
         </button>
       </div>
 
-      {isAdmin ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      {advancedToolsEnabled ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
-            onClick={() => runScript('ps1')}
+            onClick={() => runOperation('run-diagnostics')}
             disabled={isRunning}
             className="flex flex-col items-center justify-center p-5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl transition shadow-sm disabled:opacity-50"
           >
             <Terminal className="w-7 h-7 text-blue-400 mb-2" />
             <span className="font-semibold text-slate-200 text-center text-sm">Run Diagnostics</span>
-            <span className="text-xs text-slate-500 mt-1">Test-MTRHealth.ps1</span>
+            <span className="text-xs text-slate-500 mt-1">Fixed diagnostic operation</span>
           </button>
 
           <button
-            onClick={() => runScript('mtr-update')}
+            onClick={() => runOperation('install-mtr-update')}
             disabled={isRunning}
             className="flex flex-col items-center justify-center p-5 bg-slate-900 hover:bg-slate-800 border border-purple-500/40 rounded-xl transition shadow-sm disabled:opacity-50 relative group"
           >
@@ -238,7 +202,7 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
           </button>
 
           <button
-            onClick={() => runScript('update')}
+            onClick={() => runOperation('force-system-updates')}
             disabled={isRunning}
             className="flex flex-col items-center justify-center p-5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl transition shadow-sm disabled:opacity-50"
           >
@@ -246,67 +210,47 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
             <span className="font-semibold text-slate-200 text-center text-sm">Force System Updates</span>
             <span className="text-xs text-slate-500 mt-1">TPM, Store, OS</span>
           </button>
-
-          <button
-            onClick={() => runScript('cmd')}
-            disabled={isRunning}
-            className="flex flex-col items-center justify-center p-5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl transition shadow-sm disabled:opacity-50"
-          >
-            <Code className="w-7 h-7 text-indigo-400 mb-2" />
-            <span className="font-semibold text-slate-200 text-center text-sm">Run CMD Launcher</span>
-            <span className="text-xs text-slate-500 mt-1">Run-MTRCheck.cmd</span>
-          </button>
-
-          <button
-            onClick={() => runScript('exe')}
-            disabled={isRunning}
-            className="flex flex-col items-center justify-center p-5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl transition shadow-sm disabled:opacity-50"
-          >
-            <Package className="w-7 h-7 text-emerald-400 mb-2" />
-            <span className="font-semibold text-slate-200 text-center text-sm">Compile Standalone EXE</span>
-            <span className="text-xs text-slate-500 mt-1">Build-MTRCheckExe.ps1</span>
-          </button>
         </div>
       ) : (
         <div className="space-y-4 my-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <button
-              onClick={() => runScript('ps1')}
+              onClick={() => runOperation('run-diagnostics')}
               disabled={isRunning}
               className="flex items-center space-x-3 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-6 rounded-2xl shadow-xl hover:shadow-blue-500/20 transition-all disabled:opacity-50 text-base justify-center"
             >
-              {isRunning && activeJob === 'ps1' ? (
+              {isRunning && activeJob === 'run-diagnostics' ? (
                 <RefreshCw className="w-5 h-5 animate-spin" />
               ) : (
                 <Play className="w-5 h-5" />
               )}
-              <span>{isRunning && activeJob === 'ps1' ? 'Running Checks...' : 'Run Diagnostics & Optimize'}</span>
+              <span>{isRunning && activeJob === 'run-diagnostics' ? 'Running Checks...' : 'Run Diagnostics & Optimize'}</span>
             </button>
 
             <button
-              onClick={() => runScript('mtr-update')}
+              onClick={() => runOperation('install-mtr-update')}
               disabled={isRunning}
               className="flex items-center space-x-3 bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 px-6 rounded-2xl shadow-xl hover:shadow-purple-500/20 transition-all disabled:opacity-50 text-base justify-center ring-2 ring-purple-400/30"
             >
-              {isRunning && activeJob === 'mtr-update' ? (
+              {isRunning && activeJob === 'install-mtr-update' ? (
                 <RefreshCw className="w-5 h-5 animate-spin" />
               ) : (
                 <Sparkles className="w-5 h-5" />
               )}
-              <span>{isRunning && activeJob === 'mtr-update' ? 'Installing Update...' : 'Install Newest Teams Room'}</span>
+              <span>{isRunning && activeJob === 'install-mtr-update' ? 'Installing Update...' : 'Install Newest Teams Room'}</span>
             </button>
 
             <button
-              onClick={() => runScript('update')}
+              onClick={() => runOperation('force-system-updates')}
               disabled={isRunning}
               className="flex items-center space-x-3 bg-orange-600 hover:bg-orange-500 text-white font-bold py-4 px-6 rounded-2xl shadow-xl hover:shadow-orange-500/20 transition-all disabled:opacity-50 text-base justify-center"
             >
-              {isRunning && activeJob === 'update' ? (
+              {isRunning && activeJob === 'force-system-updates' ? (
                 <RefreshCw className="w-5 h-5 animate-spin" />
               ) : (
                 <DownloadCloud className="w-5 h-5" />
               )}
-              <span>{isRunning && activeJob === 'update' ? 'Updating...' : 'Force System Updates'}</span>
+              <span>{isRunning && activeJob === 'force-system-updates' ? 'Updating...' : 'Force System Updates'}</span>
             </button>
           </div>
 
@@ -340,14 +284,14 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
           </div>
           <div className="space-y-1">
             <h3 className="text-lg font-medium text-slate-200">
-              {activeJob === 'mtr-update' ? 'Downloading & Installing Official Teams Room Update...' : 'Executing Script...'}
+              {activeJob === 'install-mtr-update' ? 'Downloading & Installing Official Teams Room Update...' : 'Executing Operation...'}
             </h3>
             <p className="text-sm text-slate-400">Please wait while the operation completes on the local system.</p>
           </div>
         </div>
       )}
 
-      {!report && !isRunning && !error && rawOutput && (
+      {!report && !isRunning && rawOutput && (
          <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-inner flex flex-col">
             <div className="bg-slate-800 px-4 py-3 border-b border-slate-700 flex items-center justify-between text-sm font-mono text-slate-300">
               <div className="flex items-center space-x-2">
@@ -433,8 +377,9 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {Object.entries(report.results).map(([key, statusValue]: [string, any]) => (
-                    <tr key={key} className="hover:bg-slate-800/50 transition">
+                  {Object.keys(report.results).map((key) => {
+                    const statusValue = report.results[key];
+                    return <tr key={key} className="hover:bg-slate-800/50 transition">
                       <td className="py-4 px-6 font-medium text-slate-300">{key}</td>
                       <td className="py-4 px-6">
                         <div className="flex items-center space-x-2">
@@ -451,8 +396,8 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
                       <td className="py-4 px-6 text-sm text-slate-400">
                         {report.checkDetails?.[key] || 'No details available.'}
                       </td>
-                    </tr>
-                  ))}
+                    </tr>;
+                  })}
                 </tbody>
               </table>
             </div>
@@ -600,7 +545,7 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
               <div>
                 <h4 className="text-xs font-semibold text-slate-200 uppercase tracking-wider mb-2">Step 3: Run Script with Unrestricted Policy</h4>
                 <p className="text-xs text-slate-400 mb-2">
-                  In Admin Mode, open an elevated Command Prompt or PowerShell while Skype user is signed in and run:
+                  Open an elevated Command Prompt or PowerShell while the Skype user is signed in and run:
                 </p>
 
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between font-mono text-xs text-emerald-400">
@@ -630,7 +575,7 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
                   type="button"
                   onClick={() => {
                     setShowUpdateHelpModal(false);
-                    runScript('mtr-update');
+                    void runOperation('install-mtr-update');
                   }}
                   className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold px-5 py-2 rounded-xl text-sm transition shadow-lg shadow-purple-600/20"
                 >

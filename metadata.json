@@ -1,0 +1,6 @@
+{
+  "name": "MTR Diagnostic Suite",
+  "description": "Windows diagnostic tool and script generator for Microsoft Teams Rooms (MTR) checking 19 critical hardware, network, and system functionalities.",
+  "requestFramePermissions": ["camera", "microphone", "display-capture"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

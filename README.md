@@ -1,13 +1,45 @@
-<img width="1299" height="465" alt="image" src="https://github.com/user-attachments/assets/8d1eb9ca-2573-4bf3-acd6-80ee7a0867c6" />
+# MTR Diagnostic Suite
 
+A technician-focused desktop tool for testing and troubleshooting Microsoft Teams Rooms devices.
 
-this is a tool made for technicians and engineers to test and troubleshoot MTR devices.
+## Runtime modes
 
-this is a very early release, the code is stable but is still early access.
-dont worry I try to update the version every week but fr now enjoy the mtr suite.
-currentlly im working on implementing the automatic teams rooms update with a dynamic link towards the MS mtr manual update folder.
-but no dice as for this moment, the manual install inside of the suite does work but this does mean that you need to unlbok the file manually.
+- **Packaged Electron on Windows:** can run the fixed, built-in diagnostic and update operations. Start the application as Administrator; elevation is checked again for every privileged operation.
+- **Standalone development/preview server:** binds only to `127.0.0.1` and serves the UI. It has no command-execution HTTP API.
+- **Non-Windows:** provides an explicit preview response and never claims that a Windows operation ran.
 
-This app was made with the best intentions and if you see a bug or have any ideas on automatation please let me know :)
+The renderer can request only these bundled operation IDs:
 
+- `run-diagnostics` — read-only health checks
+- `scan-repair-updates` — requests a Windows Update scan and repairs existing MTR app registration; it does not install updates
+- `install-mtr-update` — downloads and runs the Microsoft-signed fixed MTR updater
 
+Script text and script types never cross HTTP or IPC boundaries. CMD launcher and EXE compiler actions are not runnable from the UI.
+
+## Electron security boundary
+
+The packaged app uses context isolation, disables renderer Node.js integration, enables Chromium sandboxing, and exposes only the fixed-operation method through its preload bridge. Child windows are denied. The official `https://go.microsoft.com` update link is opened in the system browser; other window creation and external navigation are blocked.
+
+“Advanced tools” is a visibility preference, not a login or authentication boundary. Privilege decisions are made in Electron immediately before each operation.
+
+## Development
+
+```bash
+npm ci
+npm run dev
+```
+
+## Verification and build
+
+```bash
+npm test
+npm run lint
+npm run build
+npm audit --omit=dev
+```
+
+Build the packaged Windows application with:
+
+```bash
+npm run electron:build
+```

@@ -1,14 +1,13 @@
 import React from 'react';
-import { Monitor, ShieldCheck, Lock, Unlock } from 'lucide-react';
+import { Monitor, ShieldCheck, Settings, X } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: string;
-  isAdmin: boolean;
-  onOpenAdmin: () => void;
-  onLockAdmin: () => void;
+  advancedToolsEnabled: boolean;
+  onEnableAdvancedTools: () => void;
+  onDisableAdvancedTools: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ activeTab, isAdmin, onOpenAdmin, onLockAdmin }) => {
+export const Header: React.FC<HeaderProps> = ({ advancedToolsEnabled, onEnableAdvancedTools, onDisableAdvancedTools }) => {
   return (
     <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 text-slate-100 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -24,7 +23,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, isAdmin, onOpenAdmin,
                 MTR Diagnostic Suite
               </h1>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                {isAdmin ? 'Admin Mode' : 'Standard Mode'}
+                {advancedToolsEnabled ? 'Advanced tools visible' : 'Standard tools'}
               </span>
             </div>
             <p className="text-xs text-slate-400 hidden sm:block">
@@ -40,23 +39,23 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, isAdmin, onOpenAdmin,
             <span>PowerShell Engine</span>
           </div>
           
-          {!isAdmin ? (
+          {!advancedToolsEnabled ? (
             <button
-              onClick={onOpenAdmin}
+              onClick={onEnableAdvancedTools}
               className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium px-3 py-1.5 rounded-lg text-sm transition-all border border-slate-700"
-              title="Unlock Developer Tools"
+              title="Show advanced tools (this is not authentication)"
             >
-              <Lock className="w-4 h-4" />
-              <span className="hidden sm:inline">Admin Login</span>
+              <Settings className="w-4 h-4" />
+              <span className="hidden sm:inline">Advanced tools</span>
             </button>
           ) : (
             <button
-              onClick={onLockAdmin}
-              className="flex items-center space-x-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 font-medium px-3 py-1.5 rounded-lg text-sm transition-all"
-              title="Lock Developer Tools"
+              onClick={onDisableAdvancedTools}
+              className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium px-3 py-1.5 rounded-lg text-sm transition-all"
+              title="Hide advanced tools"
             >
-              <Unlock className="w-4 h-4" />
-              <span className="hidden sm:inline">Lock Session</span>
+              <X className="w-4 h-4" />
+              <span className="hidden sm:inline">Hide advanced tools</span>
             </button>
           )}
         </div>

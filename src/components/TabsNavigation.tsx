@@ -1,18 +1,16 @@
 import React from 'react';
-import { Terminal, Video, FileText, Wrench, Cpu } from 'lucide-react';
+import { Terminal, Video, Wrench } from 'lucide-react';
 
 interface TabsNavigationProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  isAdmin: boolean;
 }
 
-export const TabsNavigation: React.FC<TabsNavigationProps> = ({ activeTab, setActiveTab, isAdmin }) => {
+export const TabsNavigation: React.FC<TabsNavigationProps> = ({ activeTab, setActiveTab }) => {
   const tabs = [
     { id: 'diagnostics', label: 'System Diagnostics', icon: Terminal, badge: 'Auto-Run Local Checks' },
     { id: 'live-test', label: 'Hardware Diagnostics', icon: Video, badge: 'Mic / Cam / Screen' },
     { id: 'remediation', label: 'Fix Guide', icon: Wrench, badge: 'Troubleshooting' },
-    ...(isAdmin ? [{ id: 'av-tools', label: 'AV Tools Installer', icon: Cpu, badge: 'Installers' }] : []),
   ];
 
   return (

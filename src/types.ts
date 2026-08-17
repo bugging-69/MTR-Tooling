@@ -16,9 +16,9 @@ export interface MTRReport {
   computerName: string;
   osVersion: string;
   powershellVersion: string;
-  overallStatus: 'HEALTHY' | 'WARNING' | 'CRITICAL';
+  overallStatus: 'Healthy' | 'Warning' | 'Critical';
   results: Record<string, string>; // e.g. { Display: "✅ Pass (2 Monitors, 1920x1080)", ... }
-  checkDetails: MTRCheckResult[];
+  checkDetails: Record<string, string>;
 }
 
 export interface ScriptConfig {
@@ -26,13 +26,6 @@ export interface ScriptConfig {
   minimumDisplayCount: number;
   targetPingHost: string;
   targetPingPort: number;
-  requireIPv6: boolean;
-  requireTPM: boolean;
-  requireAzureAD: boolean;
-  exportFormat: 'hashtable' | 'json' | 'html' | 'csv' | 'all' | 'json_stdout';
-  autoElevateAdmin: boolean;
-  logToEventLog: boolean;
-  webhookUrl: string;
 }
 
 export interface MTRProfilePreset {

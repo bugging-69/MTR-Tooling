@@ -1,5 +1,3 @@
-import { MTRCheckResult } from '../types';
-
 export interface MTRCheckMeta {
   key: string;
   name: string;
@@ -16,9 +14,9 @@ export const MTR_CHECKS_METADATA: Record<string, MTRCheckMeta> = {
     key: 'Display',
     name: 'Primary & Secondary Displays',
     category: 'Audio/Video',
-    description: 'Verifies active display monitors and resolution output via WMI/CIM.',
-    psCommand: 'Get-CimInstance -ClassName Win32_DesktopMonitor',
-    expectedValue: 'Active monitor detected with 1080p/4K resolution',
+    description: 'Checks whether a monitor is reported by WMI or as an OK monitor PnP device.',
+    psCommand: 'Get-CimInstance -ClassName Win32_DesktopMonitor; Get-PnpDevice -Class Monitor',
+    expectedValue: 'Monitor reported by WMI or PnP',
     troubleshooting: 'Check HDMI / DisplayPort cables connected to NUC/Compute unit. Verify display is powered on.',
     fixCommand: 'Get-CimInstance Win32_DesktopMonitor | Select-Object Name, ScreenWidth, ScreenHeight'
   },
@@ -46,21 +44,21 @@ export const MTR_CHECKS_METADATA: Record<string, MTRCheckMeta> = {
     key: 'Microphone',
     name: 'Microphone / Audio Capture',
     category: 'Audio/Video',
-    description: 'Checks audio input capture device detection (Table pods, ceiling array, or soundbar mic).',
-    psCommand: 'Get-CimInstance Win32_SoundDevice | Where-Object Status -eq "OK"',
-    expectedValue: 'Active audio capture device present',
+    description: 'Checks an active AudioEndpoint whose MMDevice instance ID proves the capture role; otherwise reports WARN when only unclassified endpoints exist.',
+    psCommand: 'Get-PnpDevice -Class AudioEndpoint | Where-Object {$_.Status -eq "OK" -and $_.InstanceId -like "SWD\\MMDEVAPI\\{0.0.1.*"}',
+    expectedValue: 'Active MMDevice capture endpoint present',
     troubleshooting: 'Verify USB connection to audio DSP or mic pod. Check Windows Privacy settings for Microphone access.',
-    fixCommand: 'Get-CimInstance Win32_SoundDevice | Select-Object Name, Status'
+    fixCommand: 'Get-PnpDevice -Class AudioEndpoint | Select-Object FriendlyName, Status, InstanceId'
   },
   Speakers: {
     key: 'Speakers',
     name: 'Speakers / Audio Playback',
     category: 'Audio/Video',
-    description: 'Verifies default audio output playback device for room audio.',
-    psCommand: 'Get-CimInstance Win32_SoundDevice | Where-Object Status -eq "OK"',
-    expectedValue: 'Active sound output device present',
-    troubleshooting: 'Ensure room speakers or soundbar are set as default audio endpoint.',
-    fixCommand: 'Get-CimInstance Win32_SoundDevice | Format-List Name, Status'
+    description: 'Checks an active AudioEndpoint whose MMDevice instance ID proves the render role; it does not claim which endpoint is the Windows default.',
+    psCommand: 'Get-PnpDevice -Class AudioEndpoint | Where-Object {$_.Status -eq "OK" -and $_.InstanceId -like "SWD\\MMDEVAPI\\{0.0.0.*"}',
+    expectedValue: 'Active MMDevice render endpoint present',
+    troubleshooting: 'Ensure room speakers or soundbar are enabled and configured for room audio.',
+    fixCommand: 'Get-PnpDevice -Class AudioEndpoint | Select-Object FriendlyName, Status, InstanceId'
   },
   VendorDevices: {
     key: 'VendorDevices',
@@ -86,9 +84,9 @@ export const MTR_CHECKS_METADATA: Record<string, MTRCheckMeta> = {
     key: 'Network',
     name: 'Active Network Interface',
     category: 'Network',
-    description: 'Verifies Ethernet LAN interface status, active IPv4 address, and link speed (>= 100 Mbps).',
-    psCommand: 'Get-NetAdapter -Physical | Where-Object Status -eq "Up"',
-    expectedValue: 'Physical Ethernet connected @ 1Gbps',
+    description: 'Requires one up physical adapter with a preferred non-APIPA active IPv4 address and at least 100 Mbps receive link speed.',
+    psCommand: 'Get-NetAdapter -Physical | Where-Object Status -eq "Up"; Get-NetIPAddress -AddressFamily IPv4',
+    expectedValue: 'Active IPv4 address and at least 100 Mbps on the same physical adapter',
     troubleshooting: 'Check Ethernet RJ45 cable, switch port VLAN, and DHCP lease.',
     fixCommand: 'Get-NetAdapter | Where-Object Status -eq "Up" | Select-Object Name, InterfaceDescription, LinkSpeed'
   },
@@ -117,27 +115,27 @@ export const MTR_CHECKS_METADATA: Record<string, MTRCheckMeta> = {
     name: 'Microsoft Teams Room Application',
     category: 'Software/Teams',
     description: 'Verifies installation of Microsoft.SkypeRoomSystem or Microsoft Teams Rooms UWP app.',
-    psCommand: 'Get-AppxPackage -AllUsers -Name "*SkypeRoomSystem*"',
-    expectedValue: 'AppxPackage Installed',
+    psCommand: 'Get-AppxPackage -AllUsers -Name "Microsoft.SkypeRoomSystem"',
+    expectedValue: 'Exact Microsoft.SkypeRoomSystem Appx package installed',
     troubleshooting: 'If missing, run Microsoft MTR deployment script to re-register SkypeRoomSystem app package.',
-    fixCommand: 'Get-AppxPackage -AllUsers -Name "*SkypeRoomSystem*" | Select-Object Name, Version, Status'
+    fixCommand: 'Get-AppxPackage -AllUsers -Name "Microsoft.SkypeRoomSystem" | Select-Object Name, Version, Status'
   },
   TeamsVersion: {
     key: 'TeamsVersion',
     name: 'Teams Room App Version',
     category: 'Software/Teams',
-    description: 'Checks installed Teams Room app version string (e.g. 5.0+ or modern Teams Rooms client).',
-    psCommand: '(Get-AppxPackage -AllUsers -Name "*SkypeRoomSystem*").Version',
-    expectedValue: 'v5.0.0 or higher',
-    troubleshooting: 'Update MTR app via Microsoft Store or Windows Update, or run manual MTR update script.',
-    fixCommand: 'Get-AppxPackage -AllUsers -Name "*SkypeRoomSystem*" | Select-Object Version'
+    description: 'Reports the installed SkypeRoomSystem version without claiming compliance because no explicit baseline is configured.',
+    psCommand: '(Get-AppxPackage -AllUsers -Name "Microsoft.SkypeRoomSystem").Version',
+    expectedValue: 'WARN: No minimum version baseline configured; version is informational only',
+    troubleshooting: 'Compare the reported version with the current baseline approved for your deployment.',
+    fixCommand: 'Get-AppxPackage -AllUsers -Name "Microsoft.SkypeRoomSystem" | Select-Object Version'
   },
   TeamsSvc: {
     key: 'TeamsSvc',
     name: 'Teams Room System Services',
     category: 'Software/Teams',
-    description: 'Verifies SkypeRoomSystem service, Win32 background services, or Microsoft Teams Rooms Services.',
-    psCommand: 'Get-Service -Name "SkypeRoomSystem*", "Teams*" -ErrorAction SilentlyContinue',
+    description: 'Checks whether a SkypeRoomSystem service is currently running.',
+    psCommand: 'Get-Service -Name "SkypeRoomSystem*" -ErrorAction SilentlyContinue',
     expectedValue: 'Services Running',
     troubleshooting: 'Start the service or check Windows Event Viewer (Application log / SkypeRoomSystem log).',
     fixCommand: 'Start-Service -Name "SkypeRoomSystemAutoUpdate" -ErrorAction SilentlyContinue'
@@ -147,8 +145,8 @@ export const MTR_CHECKS_METADATA: Record<string, MTRCheckMeta> = {
     name: 'Windows Licensing & Activation',
     category: 'System/Security',
     description: 'Checks Windows IoT Enterprise or Windows 10/11 Enterprise activation status.',
-    psCommand: 'Get-CimInstance SoftwareLicensingProduct | Where-Object LicenseStatus -eq 1',
-    expectedValue: 'LicenseStatus = 1 (Licensed)',
+    psCommand: 'Get-CimInstance SoftwareLicensingProduct -Filter "ApplicationID=\'55c92734-d682-4d71-983e-d6ec3f16059f\' AND PartialProductKey IS NOT NULL" | Where-Object LicenseStatus -eq 1',
+    expectedValue: 'Windows licensing ApplicationID has LicenseStatus = 1',
     troubleshooting: 'Run slmgr.vbs /ato or check KMS/MAK activation key.',
     fixCommand: 'slmgr.vbs /dli'
   },
@@ -156,9 +154,9 @@ export const MTR_CHECKS_METADATA: Record<string, MTRCheckMeta> = {
     key: 'NUCModel',
     name: 'Hardware Compute Model & Manufacturer',
     category: 'Hardware',
-    description: 'Queries Computer System manufacturer, model, and BIOS info (e.g., Intel NUC, HP, Lenovo, Dell).',
+    description: 'Queries Computer System manufacturer and model; it does not certify the model.',
     psCommand: 'Get-CimInstance Win32_ComputerSystem',
-    expectedValue: 'Valid MTR certified compute hardware',
+    expectedValue: 'Manufacturer and model values are available',
     troubleshooting: 'Ensure BIOS is updated to vendor MTR recommended version.',
     fixCommand: 'Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer, Model'
   },
@@ -166,11 +164,11 @@ export const MTR_CHECKS_METADATA: Record<string, MTRCheckMeta> = {
     key: 'TPM',
     name: 'Trusted Platform Module (TPM 2.0)',
     category: 'System/Security',
-    description: 'Checks TPM presence, enabling, and readiness for Windows 11 / BitLocker compliance.',
-    psCommand: 'Get-Tpm',
-    expectedValue: 'TpmPresent : True, TpmReady : True',
+    description: 'Requires TPM presence and readiness plus a Win32_Tpm SpecVersion value that includes 2.0.',
+    psCommand: 'Get-Tpm; Get-CimInstance -Namespace "Root\\CIMV2\\Security\\MicrosoftTpm" -ClassName Win32_Tpm',
+    expectedValue: 'TpmPresent=True, TpmReady=True, and SpecVersion includes 2.0',
     troubleshooting: 'Enable TPM 2.0 (Intel PTT or AMD fTPM) in BIOS setup.',
-    fixCommand: 'Get-Tpm | Select-Object TpmPresent, TpmReady, TpmEnabled'
+    fixCommand: 'Get-Tpm; Get-CimInstance -Namespace "Root\\CIMV2\\Security\\MicrosoftTpm" -ClassName Win32_Tpm | Select-Object SpecVersion'
   },
   AzureAD: {
     key: 'AzureAD',
@@ -196,9 +194,9 @@ export const MTR_CHECKS_METADATA: Record<string, MTRCheckMeta> = {
     key: 'Updates',
     name: 'Windows Update Service Status',
     category: 'Software/Teams',
-    description: 'Verifies Windows Update service (wuauserv) and auto-update configuration.',
-    psCommand: 'Get-Service -Name "wuauserv"',
-    expectedValue: 'Status : Running / Automatic',
+    description: 'Checks both the Windows Update service runtime state and startup configuration.',
+    psCommand: 'Get-CimInstance Win32_Service -Filter "Name=\'wuauserv\'"',
+    expectedValue: 'State = Running and StartMode = Auto',
     troubleshooting: 'Enable Windows Update service. Ensure Group Policy is not blocking Microsoft Store updates.',
     fixCommand: 'Set-Service -Name "wuauserv" -StartupType Automatic; Start-Service -Name "wuauserv"'
   }

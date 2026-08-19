@@ -1,16 +1,11 @@
 import path from 'node:path';
 import type { ExecutionResult, OperationId } from '../shared/operations';
+import type { ProcessResult } from './processRunner';
 import { parseOperationId } from '../shared/operations';
 import {
   generatePowerShellScript,
   generateUpdateScript,
 } from '../data/powershellTemplates';
-
-interface ProcessResult {
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-}
 
 export interface OperationRunnerDependencies {
   isPackaged: boolean;
@@ -37,7 +32,7 @@ $Url = "https://go.microsoft.com/fwlink/?linkid=2151817"
 $TargetScript = Join-Path $PSScriptRoot "official-mtr-update.ps1"
 
 try {
-    $Response = Invoke-WebRequest -Uri $Url -OutFile $TargetScript -UseBasicParsing -PassThru -ErrorAction Stop
+    $Response = Invoke-WebRequest -Uri $Url -OutFile $TargetScript -UseBasicParsing -PassThru -TimeoutSec 300 -ErrorAction Stop
     if ($null -eq $Response -or [int]$Response.StatusCode -lt 200 -or [int]$Response.StatusCode -ge 300) {
         throw "Official MTR update download did not return a successful HTTP status."
     }
@@ -88,6 +83,8 @@ const operations = {
 const notExecuted = (stdout: string, stderr: string, exitCode: number | null = null): ExecutionResult => ({
   executed: false,
   success: false,
+  timedOut: false,
+  outputLimitExceeded: false,
   exitCode,
   stdout,
   stderr,
@@ -150,7 +147,9 @@ export const createOperationRunner = (dependencies: OperationRunnerDependencies)
 
       return {
         executed: true,
-        success: processResult.exitCode === 0,
+        success: !processResult.timedOut && !processResult.outputLimitExceeded && processResult.exitCode === 0,
+        timedOut: processResult.timedOut,
+        outputLimitExceeded: processResult.outputLimitExceeded,
         exitCode: processResult.exitCode,
         stdout: processResult.stdout,
         stderr: processResult.stderr,
@@ -159,6 +158,8 @@ export const createOperationRunner = (dependencies: OperationRunnerDependencies)
       return {
         executed: false,
         success: false,
+        timedOut: false,
+        outputLimitExceeded: false,
         exitCode: null,
         stdout: '',
         stderr: `Failed to start operation: ${errorMessage(error)}`,

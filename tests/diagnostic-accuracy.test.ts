@@ -21,7 +21,7 @@ const createDependencies = (captureScript: (script: string) => void): OperationR
   secureDirectory: async () => undefined,
   writePrivateFile: async (_file, content) => captureScript(content),
   removeDirectory: async () => undefined,
-  runProcess: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
+  runProcess: async () => ({ exitCode: 0, stdout: '', stderr: '', timedOut: false, outputLimitExceeded: false }),
 });
 
 test('run-diagnostics contains checks only and no machine configuration changes', () => {
@@ -66,7 +66,7 @@ test('fixed updater validates transfer and Microsoft Authenticode signature befo
   const runner = createOperationRunner(createDependencies((content) => { script = content; }));
   await runner('install-mtr-update');
 
-  assert.match(script, /Invoke-WebRequest[^\n]*-OutFile \$TargetScript[^\n]*-PassThru[^\n]*-ErrorAction Stop/);
+  assert.match(script, /Invoke-WebRequest[^\n]*-OutFile \$TargetScript[^\n]*-PassThru[^\n]*-TimeoutSec 300[^\n]*-ErrorAction Stop/);
   assert.match(script, /StatusCode/);
   assert.match(script, /Test-Path -LiteralPath \$TargetScript -PathType Leaf/);
   assert.match(script, /Get-AuthenticodeSignature -LiteralPath \$TargetScript/);
@@ -102,6 +102,9 @@ test('diagnostic and scan-repair UI wording is honest', async () => {
   assert.match(diagnostics, /Run Diagnostics/);
   assert.match(diagnostics, /Scan Updates & Repair MTR App/);
   assert.match(diagnostics, /Requests a scan; does not install updates/);
+  assert.match(diagnostics, /Run Official MTR App Updater/);
+  assert.match(diagnostics, /may take up to 30 minutes and will time out/i);
+  assert.doesNotMatch(diagnostics, /Install Newest Teams Room/);
 });
 
 test('diagnostic metadata describes the implemented checks and non-compliance version result', () => {

@@ -9,6 +9,8 @@ export type OperationId = (typeof operationIds)[number];
 export interface ExecutionResult {
   executed: boolean;
   success: boolean;
+  timedOut: boolean;
+  outputLimitExceeded: boolean;
   exitCode: number | null;
   stdout: string;
   stderr: string;

@@ -31,15 +31,23 @@
   ],
 
   "win": {
-    "target": "nsis",
+    "target": [
+      "nsis",
+      "portable"
+    ],
     "icon": "build/icon.ico"
   },
 
   "nsis": {
+    "artifactName": "MTR Diagnostic Suite Setup.exe",
     "oneClick": false,
     "perMachine": true,
     "allowToChangeInstallationDirectory": true,
     "runAfterFinish": true
+  },
+
+  "portable": {
+    "artifactName": "MTR Diagnostic Suite Portable.exe"
   }
 },
  

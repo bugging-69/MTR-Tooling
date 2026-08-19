@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MTR_CHECKS_METADATA, MTRCheckMeta } from '../data/mtrChecksInfo';
+import { MTR_CHECKS_METADATA } from '../data/mtrChecksInfo';
 import { Search, Copy, Check, Terminal, ExternalLink, Wrench, ShieldAlert, Cpu, Network, Video, AppWindow } from 'lucide-react';
 
 export const RemediationGuide: React.FC = () => {
@@ -8,7 +8,7 @@ export const RemediationGuide: React.FC = () => {
 
   const checksList = Object.values(MTR_CHECKS_METADATA);
 
-  const handleCopyFixCommand = (key: string, cmd: string) => {
+  const handleCopyReferenceCommand = (key: string, cmd: string) => {
     navigator.clipboard.writeText(cmd);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
@@ -18,7 +18,8 @@ export const RemediationGuide: React.FC = () => {
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.troubleshooting.toLowerCase().includes(searchQuery.toLowerCase())
+    item.troubleshooting.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.referenceCommand.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -32,10 +33,10 @@ export const RemediationGuide: React.FC = () => {
           </div>
           <div>
             <h2 className="text-lg font-bold text-slate-100">
-              MTR 19-Point Troubleshooting & Remediation Guide
+              MTR 19-Point Troubleshooting & Reference Guide
             </h2>
             <p className="text-xs text-slate-400">
-              Complete reference matrix for Microsoft Teams Rooms system checks with PowerShell repair snippets.
+              Check-specific troubleshooting guidance with read-only PowerShell reference commands.
             </p>
           </div>
         </div>
@@ -47,7 +48,7 @@ export const RemediationGuide: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search checks, error codes, WMI parameters, or remediation commands..."
+            placeholder="Search checks, descriptions, troubleshooting, or reference commands..."
             className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
           />
         </div>
@@ -82,26 +83,26 @@ export const RemediationGuide: React.FC = () => {
                 </div>
               </div>
 
-              {/* Troubleshooting & Fix Snippet */}
+              {/* Troubleshooting & Reference Command */}
               <div className="space-y-2">
                 <div className="text-amber-400 font-semibold text-[11px] flex items-center justify-between">
-                  <span>Troubleshooting & Remediation:</span>
+                  <span>Troubleshooting & Reference:</span>
                   <button
-                    onClick={() => handleCopyFixCommand(item.key, item.fixCommand)}
+                    onClick={() => handleCopyReferenceCommand(item.key, item.referenceCommand)}
                     className="text-slate-400 hover:text-white flex items-center space-x-1 font-normal text-[10px]"
-                    title="Copy PowerShell repair command"
+                    title="Copy read-only PowerShell reference command"
                   >
                     {copiedKey === item.key ? (
                       <Check className="w-3 h-3 text-emerald-400" />
                     ) : (
                       <Copy className="w-3 h-3" />
                     )}
-                    <span>{copiedKey === item.key ? 'Copied!' : 'Copy Fix Snippet'}</span>
+                    <span>{copiedKey === item.key ? 'Copied!' : 'Copy Reference Command'}</span>
                   </button>
                 </div>
                 <p className="text-slate-300 leading-relaxed">{item.troubleshooting}</p>
                 <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 font-mono text-[11px] text-emerald-300 select-all">
-                  {item.fixCommand}
+                  {item.referenceCommand}
                 </div>
               </div>
             </div>

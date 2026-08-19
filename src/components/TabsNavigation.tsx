@@ -10,7 +10,7 @@ export const TabsNavigation: React.FC<TabsNavigationProps> = ({ activeTab, setAc
   const tabs = [
     { id: 'diagnostics', label: 'System Diagnostics', icon: Terminal, badge: 'Auto-Run Local Checks' },
     { id: 'live-test', label: 'Hardware Diagnostics', icon: Video, badge: 'Mic / Cam / Screen' },
-    { id: 'remediation', label: 'Fix Guide', icon: Wrench, badge: 'Troubleshooting' },
+    { id: 'remediation', label: 'Reference Guide', icon: Wrench, badge: 'Troubleshooting' },
   ];
 
   return (

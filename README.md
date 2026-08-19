@@ -8,6 +8,15 @@ A technician-focused desktop tool for testing and troubleshooting Microsoft Team
 - **Standalone development/preview server:** binds only to `127.0.0.1` and serves the UI. It has no command-execution HTTP API.
 - **Non-Windows:** provides an explicit preview response and never claims that a Windows operation ran.
 
+## Windows downloads
+
+Each release provides two Windows executables:
+
+- **MTR Diagnostic Suite Setup.exe** — the NSIS installer for a conventional system installation.
+- **MTR Diagnostic Suite Portable.exe** — a no-install build that can be run directly.
+
+Both editions must still be run as Administrator for privileged diagnostic and update operations. “Portable” means no installation is needed; it does not remove the elevation requirement.
+
 The renderer can request only these bundled operation IDs:
 
 - `run-diagnostics` — read-only health checks

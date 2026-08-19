@@ -1,43 +1,13 @@
-import { spawn } from 'node:child_process';
 import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { createOperationRunner } from './src/electron/operationRunner';
+import { createProcessRunner } from './src/electron/processRunner';
 import { isAllowedExternalUrl, secureWebPreferences } from './src/electron/windowSecurity';
 
-const MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
-
-const runProcess = (command: string, args: string[], workingDirectory = process.cwd()) =>
-  new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: workingDirectory,
-      windowsHide: true,
-      shell: false,
-    });
-    const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
-    let outputBytes = 0;
-
-    const collect = (target: Buffer[]) => (chunk: Buffer) => {
-      outputBytes += chunk.length;
-      if (outputBytes > MAX_OUTPUT_BYTES) {
-        child.kill();
-        reject(new Error('Operation output exceeded the 10 MB limit.'));
-        return;
-      }
-      target.push(chunk);
-    };
-
-    child.stdout.on('data', collect(stdout));
-    child.stderr.on('data', collect(stderr));
-    child.once('error', reject);
-    child.once('close', (exitCode) => resolve({
-      exitCode: exitCode ?? -1,
-      stdout: Buffer.concat(stdout).toString('utf8'),
-      stderr: Buffer.concat(stderr).toString('utf8'),
-    }));
-  });
+const OPERATION_TIMEOUT_MS = 30 * 60 * 1_000;
+const runProcess = createProcessRunner(OPERATION_TIMEOUT_MS);
 
 const isElevated = async () => {
   const result = await runProcess('powershell.exe', [

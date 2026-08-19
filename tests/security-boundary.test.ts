@@ -14,7 +14,7 @@ const createDependencies = (overrides: Partial<OperationRunnerDependencies> = {}
   secureDirectory: async () => undefined,
   writePrivateFile: async () => undefined,
   removeDirectory: async () => undefined,
-  runProcess: async () => ({ exitCode: 0, stdout: 'done', stderr: '' }),
+  runProcess: async () => ({ exitCode: 0, stdout: 'done', stderr: '', timedOut: false, outputLimitExceeded: false }),
   ...overrides,
 });
 
@@ -33,7 +33,7 @@ test('real execution is unavailable outside packaged Electron', async () => {
     isPackaged: false,
     runProcess: async () => {
       processRuns += 1;
-      return { exitCode: 0, stdout: '', stderr: '' };
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: false, outputLimitExceeded: false };
     },
   }));
 
@@ -67,7 +67,7 @@ test('elevation is evaluated for every privileged operation request', async () =
     },
     runProcess: async () => {
       processRuns += 1;
-      return { exitCode: 0, stdout: '', stderr: '' };
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: false, outputLimitExceeded: false };
     },
   }));
 
@@ -113,7 +113,7 @@ test('execution uses a private unique temp directory and always cleans it', asyn
     runProcess: async (_command, args) => {
       assert.deepEqual(args.slice(0, 5), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File']);
       events.push('run');
-      return { exitCode: 9, stdout: 'partial output', stderr: 'operation failed' };
+      return { exitCode: 9, stdout: 'partial output', stderr: 'operation failed', timedOut: false, outputLimitExceeded: false };
     },
     removeDirectory: async (directory) => {
       events.push(`remove:${directory}`);
@@ -177,6 +177,60 @@ test('temp directories are cleaned when process launch fails', async () => {
   assert.equal(cleaned, true);
 });
 
+test('operation timeouts remain executed, preserve output, report the deadline, and clean up', async () => {
+  let cleaned = false;
+  const runner = createOperationRunner(createDependencies({
+    runProcess: async () => ({
+      exitCode: null,
+      stdout: 'updater progress',
+      stderr: 'last updater warning',
+      timedOut: true,
+      outputLimitExceeded: false,
+    }),
+    removeDirectory: async () => {
+      cleaned = true;
+    },
+  }));
+
+  const result = await runner('install-mtr-update');
+  const message = executionFailureMessage(result);
+
+  assert.equal(result.executed, true);
+  assert.equal(result.success, false);
+  assert.equal(result.timedOut, true);
+  assert.equal(result.exitCode, null);
+  assert.equal(result.stdout, 'updater progress');
+  assert.equal(result.stderr, 'last updater warning');
+  assert.match(message ?? '', /timed out after 30 minutes/i);
+  assert.match(message ?? '', /termination was requested/i);
+  assert.doesNotMatch(message ?? '', /tree was terminated/i);
+  assert.match(message ?? '', /last updater warning/i);
+  assert.equal(cleaned, true);
+});
+
+test('output-limit failures remain executed and preserve process output', async () => {
+  const runner = createOperationRunner(createDependencies({
+    runProcess: async () => ({
+      exitCode: null,
+      stdout: 'bounded stdout',
+      stderr: 'bounded stderr',
+      timedOut: false,
+      outputLimitExceeded: true,
+    }),
+  }));
+
+  const result = await runner('install-mtr-update');
+  const message = executionFailureMessage(result);
+
+  assert.equal(result.executed, true);
+  assert.equal(result.success, false);
+  assert.equal(result.outputLimitExceeded, true);
+  assert.equal(result.stdout, 'bounded stdout');
+  assert.equal(result.stderr, 'bounded stderr');
+  assert.match(message ?? '', /output exceeded the 10 MB limit/i);
+  assert.doesNotMatch(message ?? '', /not executed/i);
+});
+
 test('window defaults isolate the renderer and deny unsafe external URLs', () => {
   assert.deepEqual(secureWebPreferences, {
     contextIsolation: true,
@@ -194,6 +248,8 @@ test('non-zero execution failures remain visible even when stdout exists', () =>
   const message = executionFailureMessage({
     executed: true,
     success: false,
+    timedOut: false,
+    outputLimitExceeded: false,
     exitCode: 5,
     stdout: 'partial useful output',
     stderr: 'access denied',

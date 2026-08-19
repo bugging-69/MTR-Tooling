@@ -197,8 +197,8 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
             className="flex flex-col items-center justify-center p-5 bg-slate-900 hover:bg-slate-800 border border-purple-500/40 rounded-xl transition shadow-sm disabled:opacity-50 relative group"
           >
             <Sparkles className="w-7 h-7 text-purple-400 mb-2" />
-            <span className="font-semibold text-purple-200 text-center text-sm">Install Newest Teams Room</span>
-            <span className="text-xs text-purple-400/80 mt-1">Official App Update</span>
+            <span className="font-semibold text-purple-200 text-center text-sm">Run Official MTR App Updater</span>
+            <span className="text-xs text-purple-400/80 mt-1">May take up to 30 minutes</span>
           </button>
 
           <button
@@ -237,7 +237,7 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
               ) : (
                 <Sparkles className="w-5 h-5" />
               )}
-              <span>{isRunning && activeJob === 'install-mtr-update' ? 'Installing Update...' : 'Install Newest Teams Room'}</span>
+              <span>{isRunning && activeJob === 'install-mtr-update' ? 'Running Official Updater...' : 'Run Official MTR App Updater'}</span>
             </button>
 
             <button
@@ -286,7 +286,11 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
             <h3 className="text-lg font-medium text-slate-200">
               {activeJob === 'install-mtr-update' ? 'Downloading & Installing Official Teams Room Update...' : 'Executing Operation...'}
             </h3>
-            <p className="text-sm text-slate-400">Please wait while the operation completes on the local system.</p>
+            <p className="text-sm text-slate-400">
+              {activeJob === 'install-mtr-update'
+                ? 'The official updater may take up to 30 minutes and will time out instead of running forever.'
+                : 'Please wait while the operation completes on the local system.'}
+            </p>
           </div>
         </div>
       )}
@@ -510,7 +514,7 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
                 <div className="text-xs space-y-1">
                   <p className="font-semibold text-purple-200">Automated Installation Available</p>
                   <p className="text-purple-300/80">
-                    Clicking <strong className="text-white">"Install Newest Teams Room"</strong> downloads the script into the private operation directory, requires a valid Microsoft Authenticode signature, then unblocks and executes that exact file as Administrator.
+                    Clicking <strong className="text-white">"Run Official MTR App Updater"</strong> downloads the script into the private operation directory, requires a valid Microsoft Authenticode signature, then unblocks and executes that exact file as Administrator. The updater may take up to 30 minutes; process-tree termination is requested if it times out.
                   </p>
                 </div>
               </div>

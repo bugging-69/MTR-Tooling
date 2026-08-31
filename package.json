@@ -35,7 +35,11 @@
       "nsis",
       "portable"
     ],
-    "icon": "build/icon.ico"
+    "icon": "build/icon.ico",
+    "certificateFile": "${CSC_LINK}",
+    "certificatePassword": "${CSC_KEY_PASSWORD}",
+    "signingHashAlgorithms": ["sha256"],
+    "sign": "./customSign.js"
   },
 
   "nsis": {
@@ -43,7 +47,9 @@
     "oneClick": false,
     "perMachine": true,
     "allowToChangeInstallationDirectory": true,
-    "runAfterFinish": true
+    "runAfterFinish": true,
+    "signingCertificateFile": "${CSC_LINK}",
+    "signingCertificatePassword": "${CSC_KEY_PASSWORD}"
   },
 
   "portable": {

@@ -44,6 +44,10 @@ export const SystemDiagnostics: React.FC<{ advancedToolsEnabled?: boolean }> = (
   const [showUpdateHelpModal, setShowUpdateHelpModal] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState(false);
 
+  // Remediation Confirmation State
+  const [showScanRepairConfirm, setShowScanRepairConfirm] = useState(false);
+  const [pendingRemediationOp, setPendingRemediationOp] = useState<'scan-repair-updates' | null>(null);
+
   const sampleCommand = `PowerShell -ExecutionPolicy Unrestricted "C:\\Users\\Admin\\Downloads\\MTR-Update-4.5.6.7.ps1"`;
 
   const copyToClipboard = (text: string) => {
@@ -202,7 +206,10 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
           </button>
 
           <button
-            onClick={() => runOperation('scan-repair-updates')}
+            onClick={() => {
+              setPendingRemediationOp('scan-repair-updates');
+              setShowScanRepairConfirm(true);
+            }}
             disabled={isRunning}
             className="flex flex-col items-center justify-center p-5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl transition shadow-sm disabled:opacity-50"
           >
@@ -241,7 +248,10 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
             </button>
 
             <button
-              onClick={() => runOperation('scan-repair-updates')}
+              onClick={() => {
+                setPendingRemediationOp('scan-repair-updates');
+                setShowScanRepairConfirm(true);
+              }}
               disabled={isRunning}
               className="flex items-center space-x-3 bg-orange-600 hover:bg-orange-500 text-white font-bold py-4 px-6 rounded-2xl shadow-xl hover:shadow-orange-500/20 transition-all disabled:opacity-50 text-base justify-center"
             >
@@ -587,6 +597,57 @@ DIAGNOSTIC CHECK RESULTS (19 PARAMETERS)
                   <span>Automate Update Now</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Scan & Repair Update Confirmation Modal */}
+      {showScanRepairConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl shadow-2xl max-w-md w-full border border-slate-700 overflow-hidden">
+            <div className="bg-slate-950 px-6 py-4 border-b border-slate-700">
+              <h3 className="text-lg font-bold text-slate-100">Confirm System Scan & Repair</h3>
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="space-y-2">
+                  <p className="text-sm text-slate-300">
+                    This operation will scan for Windows and Teams Room app updates and request repair of the MTR app if issues are detected.
+                  </p>
+                  <ul className="text-xs text-slate-400 space-y-1 ml-1">
+                    <li>• Does NOT automatically install updates</li>
+                    <li>• Requires administrator privileges</li>
+                    <li>• May take several minutes to complete</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-950 px-6 py-4 border-t border-slate-700 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowScanRepairConfirm(false)}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium rounded-xl text-sm transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowScanRepairConfirm(false);
+                  if (pendingRemediationOp) {
+                    void runOperation(pendingRemediationOp);
+                    setPendingRemediationOp(null);
+                  }
+                }}
+                className="flex items-center space-x-2 bg-orange-600 hover:bg-orange-500 text-white font-semibold px-5 py-2 rounded-xl text-sm transition shadow-lg shadow-orange-600/20"
+              >
+                <DownloadCloud className="w-4 h-4" />
+                <span>Run Scan & Repair</span>
+              </button>
             </div>
           </div>
         </div>

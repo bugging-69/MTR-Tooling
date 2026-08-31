@@ -18,51 +18,46 @@
     "electron:build": "npm run build && electron-builder"
   },
   "build": {
-  "appId": "com.mtr.diagnostic",
-  "productName": "MTR Diagnostic Suite",
-
-  "directories": {
-    "output": "release"
-  },
-
-  "files": [
-    "dist/**/*",
-    "package.json"
-  ],
-
-  "win": {
-    "target": [
-      "nsis",
-      "portable"
+    "appId": "com.mtr.diagnostic",
+    "productName": "MTR Diagnostic Suite",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
     ],
-    "icon": "build/icon.ico",
-    "certificateFile": "${CSC_LINK}",
-    "certificatePassword": "${CSC_KEY_PASSWORD}",
-    "signingHashAlgorithms": ["sha256"],
-    "sign": "./customSign.js"
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico",
+      "certificateFile": "${CSC_LINK}",
+      "certificatePassword": "${CSC_KEY_PASSWORD}",
+      "signingHashAlgorithms": ["sha256"],
+      "sign": "./customSign.js"
+    },
+    "nsis": {
+      "artifactName": "MTR Diagnostic Suite Setup.exe",
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": true,
+      "signingCertificateFile": "${CSC_LINK}",
+      "signingCertificatePassword": "${CSC_KEY_PASSWORD}"
+    },
+    "portable": {
+      "artifactName": "MTR Diagnostic Suite Portable.exe"
+    }
   },
-
-  "nsis": {
-    "artifactName": "MTR Diagnostic Suite Setup.exe",
-    "oneClick": false,
-    "perMachine": true,
-    "allowToChangeInstallationDirectory": true,
-    "runAfterFinish": true,
-    "signingCertificateFile": "${CSC_LINK}",
-    "signingCertificatePassword": "${CSC_KEY_PASSWORD}"
-  },
-
-  "portable": {
-    "artifactName": "MTR Diagnostic Suite Portable.exe"
-  }
-},
- 
-"dependencies": {
+  "dependencies": {
     "@google/genai": "^2.17.1",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.0.5",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "helmet": "8.3.0",
     "jszip": "^3.10.1",
     "lucide-react": "^1.31.0",
     "motion": "^13.1.0",

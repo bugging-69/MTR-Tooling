@@ -8,8 +8,7 @@ export const LiveWebTester: React.FC = () => {
   const [selectedMic, setSelectedMic] = useState<string>('');
   
   const [hasStarted, setHasStarted] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [micError, setMicError] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
@@ -25,36 +24,17 @@ export const LiveWebTester: React.FC = () => {
   const screenStream = useRef<MediaStream | null>(null);
 
   const requestPermissions = async () => {
-    setCameraError(null);
-    setMicError(null);
-    
-    let cameraSuccess = false;
-    let micSuccess = false;
-
-    // Request camera permission independently
+    setErrorMsg(null);
     try {
-      const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
-      cameraStream.getTracks().forEach(t => t.stop());
-      cameraSuccess = true;
+      // User gesture triggered, attempt to get devices
+      const initialStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      initialStream.getTracks().forEach(t => t.stop());
+      await refreshDevices();
+      setHasStarted(true);
     } catch (err: any) {
-      console.error('Camera permission error:', err);
-      setCameraError(err.name === 'NotAllowedError' ? 'Camera access denied' : err.message || 'Camera access failed');
+      console.error(err);
+      setErrorMsg(err.message || 'Device access denied. Make sure permissions are granted.');
     }
-
-    // Request microphone permission independently
-    try {
-      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioStream.getTracks().forEach(t => t.stop());
-      micSuccess = true;
-    } catch (err: any) {
-      console.error('Microphone permission error:', err);
-      setMicError(err.name === 'NotAllowedError' ? 'Microphone access denied' : err.message || 'Microphone access failed');
-    }
-
-    // Always allow the hardware tester to start, even if one or both fail
-    // This allows users to test what they can (speaker, screen, available devices)
-    await refreshDevices();
-    setHasStarted(true);
   };
 
   const refreshDevices = async () => {
@@ -167,19 +147,6 @@ export const LiveWebTester: React.FC = () => {
     };
   }, [selectedMic]);
 
-  useEffect(() => {
-    return () => {
-      // Cleanup on unmount: stop any active screen stream
-      if (screenStream.current) {
-        screenStream.current.getTracks().forEach(t => t.stop());
-        screenStream.current = null;
-      }
-      if (screenVideoRef.current) {
-        screenVideoRef.current.srcObject = null;
-      }
-    };
-  }, []);
-
   const startScreen = async () => {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
@@ -259,7 +226,7 @@ export const LiveWebTester: React.FC = () => {
           </div>
           <h2 className="text-xl font-bold text-slate-100 mb-2">Hardware Tester</h2>
           <p className="text-sm text-slate-400 mb-6">
-            To test your camera, microphone, speaker, and screen, this app requires device permissions.
+            To test your camera, microphone, and screen, this app requires device permissions.
           </p>
           <button
             onClick={requestPermissions}
@@ -268,6 +235,16 @@ export const LiveWebTester: React.FC = () => {
             Request Permissions
           </button>
         </div>
+
+        {errorMsg && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm flex items-start justify-center space-x-3 max-w-md mx-auto">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="text-left">
+              <h4 className="font-semibold text-red-300">Device Access Denied</h4>
+              <p className="mt-1 opacity-80">{errorMsg}</p>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -277,7 +254,7 @@ export const LiveWebTester: React.FC = () => {
       <div className="flex items-center justify-between pb-4 border-b border-slate-800">
         <div>
           <h2 className="text-xl font-bold text-slate-100">Live Hardware Test</h2>
-          <p className="text-sm text-slate-400">Test your cameras, microphones, screens, and speakers.</p>
+          <p className="text-sm text-slate-400">Select and verify your cameras, microphones, and screens.</p>
         </div>
         <button
           onClick={refreshDevices}
@@ -287,45 +264,6 @@ export const LiveWebTester: React.FC = () => {
           <span>Refresh Devices</span>
         </button>
       </div>
-
-      {(cameraError || micError) && (
-        <div className="space-y-3">
-          {cameraError && (
-            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-4 rounded-xl text-sm flex items-start justify-between">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                <div className="text-left">
-                  <h4 className="font-semibold text-amber-300">Camera Access Issue</h4>
-                  <p className="mt-1 opacity-80">{cameraError}</p>
-                </div>
-              </div>
-              <button
-                onClick={requestPermissions}
-                className="ml-4 shrink-0 px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs font-medium transition"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-          {micError && (
-            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-4 rounded-xl text-sm flex items-start justify-between">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                <div className="text-left">
-                  <h4 className="font-semibold text-amber-300">Microphone Access Issue</h4>
-                  <p className="mt-1 opacity-80">{micError}</p>
-                </div>
-              </div>
-              <button
-                onClick={requestPermissions}
-                className="ml-4 shrink-0 px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs font-medium transition"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
@@ -339,22 +277,15 @@ export const LiveWebTester: React.FC = () => {
           <select
             value={selectedCamera}
             onChange={(e) => setSelectedCamera(e.target.value)}
-            disabled={cameras.length === 0 || cameraError !== null}
-            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
           >
-            <option value="">
-              {cameras.length === 0 ? 'No cameras available' : 'Select a camera...'}
-            </option>
+            <option value="">Select a camera...</option>
             {cameras.map(c => (
               <option key={c.deviceId} value={c.deviceId}>
                 {c.label || `Camera ${c.deviceId.slice(0, 5)}`}
               </option>
             ))}
           </select>
-
-          {cameraError === null && cameras.length === 0 && (
-            <p className="text-xs text-slate-500 italic">No cameras detected on this system.</p>
-          )}
 
           <div className="bg-slate-950 rounded-lg aspect-video border border-slate-800 overflow-hidden relative flex items-center justify-center">
             <video
@@ -382,22 +313,15 @@ export const LiveWebTester: React.FC = () => {
           <select
             value={selectedMic}
             onChange={(e) => setSelectedMic(e.target.value)}
-            disabled={mics.length === 0 || micError !== null}
-            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
           >
-            <option value="">
-              {mics.length === 0 ? 'No microphones available' : 'Select a microphone...'}
-            </option>
+            <option value="">Select a microphone...</option>
             {mics.map(m => (
               <option key={m.deviceId} value={m.deviceId}>
                 {m.label || `Mic ${m.deviceId.slice(0, 5)}`}
               </option>
             ))}
           </select>
-
-          {micError === null && mics.length === 0 && (
-            <p className="text-xs text-slate-500 italic">No microphones detected on this system.</p>
-          )}
 
           <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-3">
             <div className="flex items-center justify-between text-sm text-slate-400">

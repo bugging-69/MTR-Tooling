@@ -109,7 +109,7 @@ test('diagnostic and scan-repair UI wording is honest', async () => {
 
 test('diagnostic metadata describes the implemented checks and non-compliance version result', () => {
   assert.match(MTR_CHECKS_METADATA.Microphone.psCommand, /Get-PnpDevice -Class AudioEndpoint/);
-  assert.match(MTR_CHECKS_METADATA.Network.expectedValue, /Preferred non-APIPA IPv4 address and at least 100 Mbps/i);
+  assert.match(MTR_CHECKS_METADATA.Network.expectedValue, /active IPv4 address and at least 100 Mbps/i);
   assert.match(MTR_CHECKS_METADATA.Activation.psCommand, /ApplicationID='55c92734-d682-4d71-983e-d6ec3f16059f'/i);
   assert.match(MTR_CHECKS_METADATA.TPM.psCommand, /Win32_Tpm/);
   assert.match(MTR_CHECKS_METADATA.TeamsVersion.expectedValue, /No minimum version baseline configured/i);

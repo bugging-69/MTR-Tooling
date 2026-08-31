@@ -303,16 +303,16 @@ test('makeTempDirectory rejects path traversal with parent directory references'
   const { tmpdir } = await import('node:os');
   const path = await import('node:path');
 
-  // Simulate the actual implementation
+  // Simulate the actual fixed implementation
   const makeTempDirectory = async (prefix: string) => {
     const base = path.resolve(tmpdir());
     const target = await mkdtemp(path.join(base, prefix));
-    const targetResolved = path.resolve(target);
+    const targetResolved = path.resolve(base, target);
     const relative = path.relative(base, targetResolved);
     if (relative.startsWith('..') || path.isAbsolute(relative)) {
       throw new Error('Invalid directory path');
     }
-    return target;
+    return targetResolved;
   };
 
   // Test normal operation - should succeed
@@ -339,20 +339,21 @@ test('makeTempDirectory rejects path traversal with parent directory references'
   }
 });
 
-test('makeTempDirectory rejects symlink-based path traversal attempts', async () => {
+test('makeTempDirectory resolves paths relative to base directory', async () => {
   const { mkdtemp } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');
   const path = await import('node:path');
 
+  // Simulate the fixed implementation
   const makeTempDirectory = async (prefix: string) => {
     const base = path.resolve(tmpdir());
     const target = await mkdtemp(path.join(base, prefix));
-    const targetResolved = path.resolve(target);
+    const targetResolved = path.resolve(base, target);
     const relative = path.relative(base, targetResolved);
     if (relative.startsWith('..') || path.isAbsolute(relative)) {
       throw new Error('Invalid directory path');
     }
-    return target;
+    return targetResolved;
   };
 
   // Create a legitimate temp directory
@@ -364,6 +365,10 @@ test('makeTempDirectory rejects symlink-based path traversal attempts', async ()
   
   assert.ok(!relative.startsWith('..'), 'Directory should be within tmpdir');
   assert.ok(!path.isAbsolute(relative), 'Relative path should not be absolute');
+  
+  // Verify the returned path is absolute and within base
+  assert.ok(path.isAbsolute(legitDir), 'Returned path should be absolute');
+  assert.ok(legitDir.startsWith(base), 'Returned path should be within base directory');
 });
 
 test('makeTempDirectory validation prevents absolute path escapes', async () => {

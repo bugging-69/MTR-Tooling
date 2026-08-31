@@ -1,8 +1,10 @@
 import express from 'express';
+import helmet from 'helmet';
 import path from 'node:path';
 import { createServer as createViteServer } from 'vite';
 
 const app = express();
+app.use(helmet());
 const port = 3000;
 const host = '127.0.0.1';
 

@@ -23,7 +23,16 @@ const runOperation = createOperationRunner({
   isPackaged: app.isPackaged,
   platform: process.platform,
   isElevated,
-  makeTempDirectory: (prefix) => mkdtemp(path.join(tmpdir(), prefix)),
+  makeTempDirectory: async (prefix) => {
+    const base = path.resolve(tmpdir());
+    const target = await mkdtemp(path.join(base, prefix));
+    const targetResolved = path.resolve(target);
+    const relative = path.relative(base, targetResolved);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new Error('Invalid directory path');
+    }
+    return target;
+  },
   secureDirectory: (directory) => chmod(directory, 0o700),
   writePrivateFile: (file, content) => writeFile(file, content, { encoding: 'utf8', mode: 0o600, flag: 'wx' }),
   removeDirectory: (directory) => rm(directory, { recursive: true, force: true }),

@@ -26,12 +26,12 @@ const runOperation = createOperationRunner({
   makeTempDirectory: async (prefix) => {
     const base = path.resolve(tmpdir());
     const target = await mkdtemp(path.join(base, prefix));
-    const targetResolved = path.resolve(target);
+    const targetResolved = path.resolve(base, target);
     const relative = path.relative(base, targetResolved);
     if (relative.startsWith('..') || path.isAbsolute(relative)) {
       throw new Error('Invalid directory path');
     }
-    return target;
+    return targetResolved;
   },
   secureDirectory: (directory) => chmod(directory, 0o700),
   writePrivateFile: (file, content) => writeFile(file, content, { encoding: 'utf8', mode: 0o600, flag: 'wx' }),

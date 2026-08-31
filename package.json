@@ -27,31 +27,29 @@
       "dist/**/*",
       "package.json"
     ],
-    "win": {
-      "target": [
-        "nsis",
-        "portable"
-      ],
-      "icon": "build/icon.ico",
-      "certificateFile": "${CSC_LINK}",
-      "certificatePassword": "${CSC_KEY_PASSWORD}",
-      "signingHashAlgorithms": ["sha256"],
-      "sign": "./customSign.js"
-    },
-    "nsis": {
-      "artifactName": "MTR Diagnostic Suite Setup.exe",
-      "oneClick": false,
-      "perMachine": true,
-      "allowToChangeInstallationDirectory": true,
-      "runAfterFinish": true,
-      "signingCertificateFile": "${CSC_LINK}",
-      "signingCertificatePassword": "${CSC_KEY_PASSWORD}"
-    },
-    "portable": {
-      "artifactName": "MTR Diagnostic Suite Portable.exe"
-    }
+    "icon": "build/icon.ico",
+    "certificateFile": "${CSC_LINK}",
+    "certificatePassword": "${CSC_KEY_PASSWORD}",
+    "signingHashAlgorithms": ["sha256"],
+    "sign": "./customSign.js"
   },
-  "dependencies": {
+
+  "nsis": {
+    "artifactName": "MTR Diagnostic Suite Setup.exe",
+    "oneClick": false,
+    "perMachine": true,
+    "allowToChangeInstallationDirectory": true,
+    "runAfterFinish": true,
+    "signingCertificateFile": "${CSC_LINK}",
+    "signingCertificatePassword": "${CSC_KEY_PASSWORD}"
+  },
+
+  "portable": {
+    "artifactName": "MTR Diagnostic Suite Portable.exe"
+  }
+},
+ 
+"dependencies": {
     "@google/genai": "^2.17.1",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.0.5",

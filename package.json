@@ -3,50 +3,64 @@
   "author": "Willem Kuipers",
   "description": "MTR Diagnostic Suite",
   "private": true,
-  "version": "2.8.0",
+  "version": "2.9.0",
   "type": "module",
   "main": "dist/electron-main.cjs",
+
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && esbuild electron-main.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/electron-main.cjs && esbuild electron-preload.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/electron-preload.cjs",
     "start": "node dist/server.cjs",
     "test": "tsx --test tests/**/*.test.ts",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "clean": "rimraf dist server.js release",
     "lint": "tsc --noEmit",
     "electron:start": "npm run build && electron .",
     "electron:build": "npm run build && electron-builder"
   },
+
   "build": {
     "appId": "com.mtr.diagnostic",
     "productName": "MTR Diagnostic Suite",
+
     "directories": {
       "output": "release"
     },
+
     "files": [
       "dist/**/*",
       "package.json"
     ],
+
     "icon": "build/icon.ico",
-    "certificateFile": "${CSC_LINK}",
-    "certificatePassword": "${CSC_KEY_PASSWORD}",
-    "signingHashAlgorithms": ["sha256"],
-    "sign": "./customSign.js"
+
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+
+    "nsis": {
+      "artifactName": "MTR Diagnostic Suite Setup.exe",
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": true
+    },
+
+    "portable": {
+      "artifactName": "MTR Diagnostic Suite Portable.exe"
+    }
   },
 
-"nsis": {
-  "artifactName": "MTR Diagnostic Suite Setup.exe",
-  "oneClick": false,
-  "perMachine": true,
-  "allowToChangeInstallationDirectory": true,
-  "runAfterFinish": true,
-  "signingCertificateFile": "${CSC_LINK}",
-  "signingCertificatePassword": "${CSC_KEY_PASSWORD}"
-},
-"portable": {
-  "artifactName": "MTR Diagnostic Suite Portable.exe"
-},
-"dependencies": {
+  "dependencies": {
     "@google/genai": "^2.17.1",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.0.5",
@@ -57,9 +71,9 @@
     "lucide-react": "^1.31.0",
     "motion": "^13.1.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "vite": "^8.2.1"
+    "react-dom": "^19.2.8"
   },
+
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.2.0",
@@ -67,11 +81,13 @@
     "electron": "^43.4.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
+    "rimraf": "^6.0.1",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.12",
-    "typescript": "~7.0.2",
+    "typescript": "^5.9.2",
     "vite": "^8.2.1"
   },
+
   "allowScripts": {
     "@google/genai@2.16.0": true,
     "electron-winstaller@5.4.0": true,
@@ -79,4 +95,4 @@
     "esbuild@0.25.12": true,
     "protobufjs@7.6.5": true
   }
-  }
+}
